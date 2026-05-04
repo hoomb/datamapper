@@ -6,7 +6,7 @@
 
     <groupId>de.hoomit</groupId>
     <artifactId>datamapper</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>DataMapper Framework</name>
     <description>DataMapper framework with field-set filtering</description>
@@ -41,7 +41,7 @@
         <developerConnection>scm:git:git@github.com:hoomb/datamapper.git</developerConnection>
         <url>scm:git:git@github.com:hoomb/datamapper.git</url>
         <connection>scm:git:git@github.com:hoomb/datamapper.git</connection>
-        <tag>datamapper-1.0.0</tag>
+        <tag>datamapper-1.1.0</tag>
     </scm>
 
     <dependencies>
