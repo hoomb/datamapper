@@ -1,6 +1,6 @@
 package de.hoomit.mapping.test;
 
-import de.hoomit.mapping.impl.DefaultDataMapper;
+import de.hoomit.mapping.mapper.DefaultDataMapper;
 import de.hoomit.mapping.test.domain.ProductData;
 import de.hoomit.mapping.test.domain.ProductWsDTO;
 import de.hoomit.mapping.test.mappers.NullCollectionFilter;
@@ -59,7 +59,7 @@ class DataMapperTest {
         p.setCode("P001");
         p.setName("Laptop Pro");
         p.setDescription("High-end laptop for professionals");
-        p.setBasePrice(BigDecimal.valueOf(1299.99D));
+        p.setBasePrice(new BigDecimal("1299.99"));
         p.setCurrencyIso("EUR");
         p.setStockLevel(42);
         p.setAvailable(true);
@@ -329,8 +329,81 @@ class DataMapperTest {
     }
 
     // =========================================================================
-    // Edge cases
+    // Custom named field sets
     // =========================================================================
+
+    @Test
+    @Order(19)
+    @DisplayName("Custom 'SEARCH' set: code, name, categoryNames only")
+    void testCustomSearchFieldSet() {
+        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "SEARCH");
+
+        assertEquals("P001", dto.getCode());
+        assertEquals("Laptop Pro", dto.getName());
+        assertNotNull(dto.getCategoryNames(), "categoryNames is part of SEARCH set");
+        assertEquals(2, dto.getCategoryNames().size());
+        assertNull(dto.getDescription(), "description NOT in SEARCH set");
+        assertNull(dto.getPrice(), "price NOT in SEARCH set");
+        assertEquals(0, dto.getStockLevel(), "stockLevel NOT in SEARCH set");
+    }
+
+    @Test
+    @Order(20)
+    @DisplayName("Custom 'CHECKOUT' set: code, name, price, stockLevel only")
+    void testCustomCheckoutFieldSet() {
+        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "CHECKOUT");
+
+        assertEquals("P001", dto.getCode());
+        assertEquals("Laptop Pro", dto.getName());
+        assertEquals(42, dto.getStockLevel());
+        assertNotNull(dto.getPrice(), "price should be in CHECKOUT set (via CustomMapper)");
+        assertNull(dto.getDescription(), "description NOT in CHECKOUT set");
+        assertNull(dto.getManufacturerName(), "manufacturerName NOT in CHECKOUT set");
+        assertFalse(dto.isAvailable(), "available NOT in CHECKOUT set — stays false (default)");
+    }
+
+    @Test
+    @Order(21)
+    @DisplayName("Custom 'ADMIN' set (empty fields = all): behaves like FULL")
+    void testCustomAdminFieldSet() {
+        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "ADMIN");
+
+        assertEquals("P001", dto.getCode());
+        assertEquals("Laptop Pro", dto.getName());
+        assertEquals("High-end laptop for professionals", dto.getDescription());
+        assertEquals("TechCorp", dto.getManufacturerName());
+        assertNotNull(dto.getPrice(), "price mapped via CustomMapper");
+        assertTrue(dto.isAvailable());
+    }
+
+    @Test
+    @Order(22)
+    @DisplayName("Custom set + extra field: 'SEARCH,description' extends SEARCH with description")
+    void testCustomSetPlusExtraField() {
+        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "SEARCH,description");
+
+        assertEquals("P001", dto.getCode());
+        assertEquals("Laptop Pro", dto.getName());
+        assertNotNull(dto.getCategoryNames());
+        assertEquals("High-end laptop for professionals", dto.getDescription(),
+                "description added via mixed descriptor");
+        assertNull(dto.getPrice(), "price still not in SEARCH,description");
+    }
+
+    @Test
+    @Order(23)
+    @DisplayName("Custom set is case-insensitive: 'search' resolves same as 'SEARCH'")
+    void testCustomFieldSetCaseInsensitive() {
+        final ProductWsDTO upper = dataMapper.map(fullProduct(), ProductWsDTO.class, "SEARCH");
+        final ProductWsDTO lower = dataMapper.map(fullProduct(), ProductWsDTO.class, "search");
+        final ProductWsDTO mixed = dataMapper.map(fullProduct(), ProductWsDTO.class, "Search");
+
+        assertEquals(upper.getCode(), lower.getCode());
+        assertEquals(upper.getCategoryNames(), lower.getCategoryNames());
+        assertEquals(upper.getCode(), mixed.getCode());
+        assertNull(lower.getPrice());
+        assertNull(mixed.getPrice());
+    }
 
     @Test
     @Order(18)

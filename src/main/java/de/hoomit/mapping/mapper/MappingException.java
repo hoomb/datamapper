@@ -1,4 +1,4 @@
-package de.hoomit.mapping.impl;
+package de.hoomit.mapping.mapper;
 
 /**
  * Unchecked exception thrown when the mapping framework encounters an

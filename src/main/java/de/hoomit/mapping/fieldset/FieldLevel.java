@@ -22,7 +22,7 @@ public enum FieldLevel {
         this.rank = rank;
     }
 
-    public boolean includes(final FieldLevel other) {
+    public boolean includes(FieldLevel other) {
         return this.rank >= other.rank;
     }
 }

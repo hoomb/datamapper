@@ -1,12 +1,11 @@
-package de.hoomit.mapping.impl;
+package de.hoomit.mapping.mapper;
 
-import de.hoomit.mapping.DataMapper;
+
 import de.hoomit.mapping.annotation.WsDTOMapping;
 import de.hoomit.mapping.context.MappingContext;
 import de.hoomit.mapping.converter.Converter;
 import de.hoomit.mapping.fieldset.FieldSetBuilder;
 import de.hoomit.mapping.filter.FieldFilter;
-import de.hoomit.mapping.mapper.CustomMapper;
 
 import java.lang.reflect.Type;
 import java.util.Collection;
@@ -27,7 +26,7 @@ import java.util.stream.StreamSupport;
  * <ol>
  *   <li>If a {@link Converter} is registered for (source, dest), delegate entirely.</li>
  *   <li>Otherwise: run the {@link ReflectionMappingEngine} to copy matching fields.</li>
- *   <li>If a {@link CustomMapper} is registered, call {@code mapAtoB} as a post-processor.</li>
+ *   <li>If a {@link de.hoomit.mapping.mapper.CustomMapper} is registered, call {@code mapAtoB} as a post-processor.</li>
  * </ol>
  * </p>
  *
@@ -41,6 +40,8 @@ import java.util.stream.StreamSupport;
  */
 public class DefaultDataMapper implements DataMapper {
 
+    private static final String FIELDSET_DEFAULT = "DEFAULT";
+    private static final String FIELDSET_EXPLICIT = "EXPLICIT";
     private final MappingRegistry registry = new MappingRegistry();
     private final ReflectionMappingEngine engine = new ReflectionMappingEngine();
 
@@ -52,28 +53,28 @@ public class DefaultDataMapper implements DataMapper {
      * Auto-register all beans in the iterable that are annotated with {@link WsDTOMapping}.
      */
     public void registerBeans(final Iterable<?> beans) {
-        for (final Object bean : beans) {
-            if (bean.getClass().isAnnotationPresent(WsDTOMapping.class)) {
-                switch (bean) {
-                    case Converter<?, ?> c -> registry.registerConverter(c);
-                    case CustomMapper<?, ?> m -> registry.registerMapper(m);
-                    case FieldFilter f -> registry.registerFilter(f);
-                    default -> {
+        StreamSupport.stream(beans.spliterator(), false)
+                .filter(bean -> bean.getClass().isAnnotationPresent(WsDTOMapping.class))
+                .forEach(bean -> {
+                    if (bean instanceof final Converter<?, ?> c) {
+                        registry.registerConverter(c);
+                    } else if (bean instanceof final CustomMapper<?, ?> m) {
+                        registry.registerMapper(m);
+                    } else if (bean instanceof final FieldFilter f) {
+                        registry.registerFilter(f);
                     }
-                }
-            }
-        }
+                });
     }
 
-    public void addConverter(Converter<?, ?> converter) {
+    public void addConverter(final Converter<?, ?> converter) {
         registry.registerConverter(converter);
     }
 
-    public void addMapper(CustomMapper<?, ?> mapper) {
+    public void addMapper(final CustomMapper<?, ?> mapper) {
         registry.registerMapper(mapper);
     }
 
-    public void addFilter(FieldFilter filter) {
+    public void addFilter(final FieldFilter filter) {
         registry.registerFilter(filter);
     }
 
@@ -93,7 +94,7 @@ public class DefaultDataMapper implements DataMapper {
 
         final Set<String> resolved = FieldSetBuilder.resolve(destClass, fields);
         final MappingContext ctx = MappingContext.builder()
-                .fieldSetName(fields != null ? fields : "DEFAULT")
+                .fieldSetName(fields != null ? fields : FIELDSET_DEFAULT)
                 .resolvedFields(resolved)
                 .build();
 
@@ -106,7 +107,7 @@ public class DefaultDataMapper implements DataMapper {
         Objects.requireNonNull(destClass, "destinationClass must not be null");
 
         final MappingContext ctx = MappingContext.builder()
-                .fieldSetName("EXPLICIT")
+                .fieldSetName(FIELDSET_EXPLICIT)
                 .resolvedFields(fields != null ? fields : Collections.emptySet())
                 .build();
 
@@ -119,12 +120,12 @@ public class DefaultDataMapper implements DataMapper {
 
     @Override
     public <S, D> void map(final S source, final D dest) {
-        map(source, dest, (String) null, false);
+        map(source, dest, null, false);
     }
 
     @Override
     public <S, D> void map(final S source, final D dest, final boolean mapNulls) {
-        map(source, dest, (String) null, mapNulls);
+        map(source, dest, null, mapNulls);
     }
 
     @Override
@@ -134,14 +135,15 @@ public class DefaultDataMapper implements DataMapper {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <S, D> void map(final S source, final D dest, final String fields, final boolean mapNulls) {
+    public <S, D> void map(final S source, final D dest,
+                           final String fields, final boolean mapNulls) {
         Objects.requireNonNull(source, "sourceObject must not be null");
         Objects.requireNonNull(dest, "destinationObject must not be null");
 
         final Class<D> destClass = (Class<D>) dest.getClass();
         final Set<String> resolved = FieldSetBuilder.resolve(destClass, fields);
         final MappingContext ctx = MappingContext.builder()
-                .fieldSetName(fields != null ? fields : "DEFAULT")
+                .fieldSetName(fields != null ? fields : FIELDSET_DEFAULT)
                 .mapNulls(mapNulls)
                 .resolvedFields(resolved)
                 .build();
@@ -166,7 +168,7 @@ public class DefaultDataMapper implements DataMapper {
         final Class<D> destClass = (Class<D>) dest.getClass();
         final Set<String> resolved = FieldSetBuilder.resolve(destClass, fields);
         final MappingContext ctx = MappingContext.builder()
-                .fieldSetName(fields != null ? fields : "DEFAULT")
+                .fieldSetName(fields != null ? fields : FIELDSET_DEFAULT)
                 .resolvedFields(resolved)
                 .extra("sourceTypeArgs", sourceTypeArgs)
                 .extra("destTypeArgs", destTypeArgs)
@@ -181,26 +183,27 @@ public class DefaultDataMapper implements DataMapper {
     // =========================================================================
 
     @Override
-    public <S, D> List<D> mapAsList(final Iterable<S> source, final Class<D> destClass, final String fields) {
+    public <S, D> List<D> mapAsList(final Iterable<S> source,
+                                    final Class<D> destClass, final String fields) {
         return StreamSupport.stream(source.spliterator(), false)
                 .map(item -> map(item, destClass, fields))
                 .collect(Collectors.toList());
     }
 
     @Override
-    public <S, D> Set<D> mapAsSet(final Iterable<S> source, final Class<D> destClass, final String fields) {
+    public <S, D> Set<D> mapAsSet(final Iterable<S> source,
+                                  final Class<D> destClass, final String fields) {
         return StreamSupport.stream(source.spliterator(), false)
                 .map(item -> map(item, destClass, fields))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     @Override
-    public <S, D> void mapAsCollection(
-            final Iterable<S> source, final Collection<D> destination,
-            final Class<D> destClass, final String fields) {
-        for (final S item : source) {
-            destination.add(map(item, destClass, fields));
-        }
+    public <S, D> void mapAsCollection(final Iterable<S> source, final Collection<D> destination,
+                                       final Class<D> destClass, final String fields) {
+        StreamSupport.stream(source.spliterator(), false)
+                .map(item -> map(item, destClass, fields))
+                .forEach(destination::add);
     }
 
     // =========================================================================
@@ -209,21 +212,17 @@ public class DefaultDataMapper implements DataMapper {
 
     @SuppressWarnings("unchecked")
     private <S, D> D doMap(final S source, final Class<D> destClass, final MappingContext ctx) {
-        // 1. Check for a registered Converter
-        final Optional<Converter<S, D>> converter = registry.findConverter((Class<S>) source.getClass(), destClass);
+        final Optional<Converter<S, D>> converter =
+                registry.findConverter((Class<S>) source.getClass(), destClass);
         if (converter.isPresent()) {
             return converter.get().convert(source, ctx);
         }
 
-        // 2. Instantiate destination
         final D dest = instantiate(destClass);
-
-        // 3. Reflection mapping
         engine.map(source, dest, ctx, registry.getFilters());
 
-        // 4. Post-process with CustomMapper if registered
-        final Optional<CustomMapper<S, D>> mapper = registry.findMapper((Class<S>) source.getClass(), destClass);
-        mapper.ifPresent(m -> m.mapAtoB(source, dest, ctx));
+        registry.findMapper((Class<S>) source.getClass(), destClass)
+                .ifPresent(m -> m.mapAtoB(source, dest, ctx));
 
         return dest;
     }
@@ -233,7 +232,6 @@ public class DefaultDataMapper implements DataMapper {
         final Class<S> srcClass = (Class<S>) source.getClass();
         final Class<D> destClass = (Class<D>) dest.getClass();
 
-        // If a Converter exists, it creates a NEW object – we can copy its fields onto dest
         final Optional<Converter<S, D>> converter = registry.findConverter(srcClass, destClass);
         if (converter.isPresent()) {
             final D tmp = converter.get().convert(source, ctx);
@@ -241,11 +239,10 @@ public class DefaultDataMapper implements DataMapper {
             return;
         }
 
-        // Reflection mapping
         engine.map(source, dest, ctx, registry.getFilters());
 
-        // Post-process
-        registry.findMapper(srcClass, destClass).ifPresent(m -> m.mapAtoB(source, dest, ctx));
+        registry.findMapper(srcClass, destClass)
+                .ifPresent(m -> m.mapAtoB(source, dest, ctx));
     }
 
     // =========================================================================
@@ -256,9 +253,7 @@ public class DefaultDataMapper implements DataMapper {
         try {
             return clazz.getDeclaredConstructor().newInstance();
         } catch (final Exception e) {
-            throw new MappingException(
-                    "Cannot instantiate destination class " + clazz.getName()
-                            + ". Ensure it has a public no-arg constructor.", e);
+            throw new MappingException("Cannot instantiate destination class " + clazz.getName() + ". Ensure it has a public no-arg constructor.", e);
         }
     }
 }

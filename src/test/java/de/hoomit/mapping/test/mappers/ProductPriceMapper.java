@@ -19,7 +19,7 @@ import java.util.Locale;
 public class ProductPriceMapper implements CustomMapper<ProductData, ProductWsDTO> {
 
     @Override
-    public void mapAtoB(final ProductData source, final ProductWsDTO dest, final MappingContext ctx) {
+    public void mapAtoB(ProductData source, ProductWsDTO dest, MappingContext ctx) {
         if (ctx.includes("price") && source.getBasePrice() != null) {
             final BigDecimal price = source.getBasePrice();
             final NumberFormat eurFormat = NumberFormat.getCurrencyInstance(Locale.GERMANY);
@@ -28,7 +28,7 @@ public class ProductPriceMapper implements CustomMapper<ProductData, ProductWsDT
     }
 
     @Override
-    public void mapBtoA(final ProductWsDTO source, final ProductData dest, final MappingContext ctx) {
+    public void mapBtoA(ProductWsDTO source, ProductData dest, MappingContext ctx) {
         // Parse back if needed – simplified
         if (source.getPrice() != null) {
             final String[] parts = source.getPrice().split(" ");
@@ -36,7 +36,7 @@ public class ProductPriceMapper implements CustomMapper<ProductData, ProductWsDT
                 try {
                     dest.setBasePrice(new BigDecimal(parts[1]));
                     dest.setCurrencyIso(parts[0]);
-                } catch (final NumberFormatException ignored) {
+                } catch (NumberFormatException ignored) {
                 }
             }
         }

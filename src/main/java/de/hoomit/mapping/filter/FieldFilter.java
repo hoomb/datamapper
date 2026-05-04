@@ -1,6 +1,5 @@
 package de.hoomit.mapping.filter;
 
-import de.hoomit.mapping.annotation.WsDTOMapping;
 import de.hoomit.mapping.context.MappingContext;
 
 /**
@@ -9,7 +8,7 @@ import de.hoomit.mapping.context.MappingContext;
  *
  * <p>Filters are consulted per field <em>after</em> the field-set check.
  * Register implementations by annotating them with
- * {@link WsDTOMapping}.</p>
+ * {@link de.hoomit.mapping.annotation.WsDTOMapping}.</p>
  *
  * <p>Example – exclude fields with empty collections:
  * <pre>

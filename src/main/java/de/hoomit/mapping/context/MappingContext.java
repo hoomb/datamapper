@@ -18,23 +18,18 @@ import java.util.Set;
  * </p>
  */
 public final class MappingContext {
-    public static final String FIELDSET_DEFAULT = "DEFAULT";
-    public static final String FIELDSET_FULL = "FULL";
-
-    // -------------------------------------------------------------------------
-
     private final String fieldSetName;
     private final boolean mapNulls;
     private final String fieldPrefix;
     private final Set<String> resolvedFields;   // lazily populated by DefaultDataMapper
     private final Map<String, Object> extras;   // extension map for custom attributes
 
-    private MappingContext(final Builder builder) {
-        this.fieldSetName = builder.fieldSetName;
-        this.mapNulls = builder.mapNulls;
-        this.fieldPrefix = builder.fieldPrefix;
-        this.resolvedFields = builder.resolvedFields;
-        this.extras = Map.copyOf(builder.extras);
+    private MappingContext(final Builder b) {
+        this.fieldSetName = b.fieldSetName;
+        this.mapNulls = b.mapNulls;
+        this.fieldPrefix = b.fieldPrefix;
+        this.resolvedFields = b.resolvedFields;
+        this.extras = Map.copyOf(b.extras);
     }
 
     // -------------------------------------------------------------------------
@@ -69,10 +64,7 @@ public final class MappingContext {
      * Check if a field should be included in this mapping pass.
      */
     public boolean includes(final String fieldName) {
-        if (resolvedFields == null || resolvedFields.isEmpty()) {
-            return true;
-        }
-
+        if (resolvedFields == null || resolvedFields.isEmpty()) return true;
         final String prefixed = (fieldPrefix != null && !fieldPrefix.isBlank())
                 ? fieldPrefix + "." + fieldName
                 : fieldName;
@@ -91,18 +83,18 @@ public final class MappingContext {
      * Convenience: DEFAULT field set, no null mapping.
      */
     public static MappingContext defaults() {
-        return builder().fieldSetName(FIELDSET_DEFAULT).build();
+        return builder().fieldSetName("DEFAULT").build();
     }
 
     /**
      * Convenience: FULL field set, map nulls.
      */
     public static MappingContext full() {
-        return builder().fieldSetName(FIELDSET_FULL).mapNulls(true).build();
+        return builder().fieldSetName("FULL").mapNulls(true).build();
     }
 
     public static final class Builder {
-        private String fieldSetName = FIELDSET_DEFAULT;
+        private String fieldSetName = "DEFAULT";
         private boolean mapNulls = false;
         private String fieldPrefix = "";
         private Set<String> resolvedFields = Collections.emptySet();

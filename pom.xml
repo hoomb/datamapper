@@ -6,7 +6,7 @@
 
     <groupId>de.hoomit</groupId>
     <artifactId>datamapper</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
     <name>DataMapper Framework</name>
     <description>DataMapper framework with field-set filtering</description>

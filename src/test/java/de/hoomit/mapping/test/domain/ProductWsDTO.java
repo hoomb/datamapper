@@ -1,6 +1,7 @@
 package de.hoomit.mapping.test.domain;
 
 import de.hoomit.mapping.fieldset.FieldSetDefinition;
+import de.hoomit.mapping.fieldset.NamedFieldSet;
 
 import java.util.List;
 
@@ -8,20 +9,28 @@ import java.util.List;
  * Web Service DTO for a product.
  * <p>
  * Field set levels:
- * - BASIC:   code, name
- * - DEFAULT: code, name, price, available
- * - FULL:    (all fields, empty = sentinel)
+ * - BASIC:    code, name
+ * - DEFAULT:  code, name, price, available, stockLevel
+ * - FULL:     (all fields, empty = sentinel)
+ * - SEARCH:   code, name, categoryNames          (custom – search result cards)
+ * - CHECKOUT: code, name, price, stockLevel      (custom – cart/checkout line items)
+ * - ADMIN:    (all fields, empty = sentinel)     (custom – admin tools)
  */
 @FieldSetDefinition(
         basic = {"code", "name"},
         defaults = {"code", "name", "price", "available", "stockLevel"},
-        full = {} // empty = include ALL fields
+        full = {},
+        custom = {
+                @NamedFieldSet(name = "SEARCH", fields = {"code", "name", "categoryNames"}),
+                @NamedFieldSet(name = "CHECKOUT", fields = {"code", "name", "price", "stockLevel"}),
+                @NamedFieldSet(name = "ADMIN", fields = {}) // empty = ALL fields, like FULL
+        }
 )
 public class ProductWsDTO {
     private String code;
     private String name;
     private String description;
-    private String price;          // formatted price string (custom converter)
+    private String price;
     private String currencyIso;
     private int stockLevel;
     private boolean available;

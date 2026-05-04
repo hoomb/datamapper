@@ -14,16 +14,15 @@ import java.util.Collection;
 public class NullCollectionFilter implements FieldFilter {
 
     @Override
-    public boolean isApplicable(final Class<?> sourceType, final Class<?> destType) {
+    public boolean isApplicable(Class<?> sourceType, Class<?> destType) {
         return true; // applies globally
     }
 
     @Override
-    public boolean include(final String fieldName, final Object value, final MappingContext ctx) {
+    public boolean include(String fieldName, Object value, MappingContext ctx) {
         if (value instanceof Collection<?> col) {
             return !col.isEmpty();
         }
-
         return true;
     }
 }

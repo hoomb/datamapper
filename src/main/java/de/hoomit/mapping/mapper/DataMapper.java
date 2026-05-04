@@ -1,4 +1,4 @@
-package de.hoomit.mapping;
+package de.hoomit.mapping.mapper;
 
 import java.lang.reflect.Type;
 import java.util.Collection;

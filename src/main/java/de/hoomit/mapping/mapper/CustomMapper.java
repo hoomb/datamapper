@@ -1,6 +1,5 @@
 package de.hoomit.mapping.mapper;
 
-import de.hoomit.mapping.annotation.WsDTOMapping;
 import de.hoomit.mapping.context.MappingContext;
 
 /**
@@ -9,7 +8,7 @@ import de.hoomit.mapping.context.MappingContext;
  * naming convention, apply type conversions, or add computed properties.
  *
  * <p>Register implementations by annotating them with
- * {@link WsDTOMapping}.</p>
+ * {@link de.hoomit.mapping.annotation.WsDTOMapping}.</p>
  *
  * <p>Example:
  * <pre>

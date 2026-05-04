@@ -1,6 +1,5 @@
 package de.hoomit.mapping.converter;
 
-import de.hoomit.mapping.annotation.WsDTOMapping;
 import de.hoomit.mapping.context.MappingContext;
 
 /**
@@ -8,7 +7,7 @@ import de.hoomit.mapping.context.MappingContext;
  *
  * <p>Converters are responsible for the <em>full</em> construction and population of
  * the destination object. Register implementations by annotating them with
- * {@link WsDTOMapping} so they are discovered automatically.
+ * {@link de.hoomit.mapping.annotation.WsDTOMapping} so they are discovered automatically.
  * </p>
  *
  * <p>Example:

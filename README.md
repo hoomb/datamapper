@@ -1,6 +1,6 @@
 # DataMapper Framework
 
-> A lightweight, extensible Java object-mapping framework inspired by the SAP Hybris / SAP Commerce `DataMapper` API — featuring **field-set filtering**, **auto-discovery**, custom converters, post-processing mappers, and field filters. No Orika, no Hybris dependencies required.
+> A lightweight, extensible Java object-mapping framework inspired by the SAP Hybris / SAP Commerce Cloud `DataMapper` API — featuring **field-set filtering with custom named sets**, **auto-discovery**, custom converters, post-processing mappers, and field filters. No Orika, no Hybris dependencies required.
 
 ---
 
@@ -14,6 +14,7 @@
   - [Build](#build)
 - [Core Concepts](#core-concepts)
   - [Field Sets](#field-sets)
+  - [Custom Named Field Sets](#custom-named-field-sets)
   - [MappingContext](#mappingcontext)
   - [Converters](#converters)
   - [CustomMappers](#custommappers)
@@ -22,12 +23,14 @@
 - [Usage Examples](#usage-examples)
   - [1. Basic Mapping](#1-basic-mapping)
   - [2. Field-Set Filtering](#2-field-set-filtering)
-  - [3. Mapping onto an Existing Object](#3-mapping-onto-an-existing-object)
-  - [4. Collection Mapping](#4-collection-mapping)
-  - [5. Custom Converter](#5-custom-converter)
-  - [6. CustomMapper Post-Processor](#6-custommapper-post-processor)
-  - [7. FieldFilter](#7-fieldfilter)
-  - [8. Generic Type Mapping](#8-generic-type-mapping)
+  - [3. Custom Named Field Sets](#3-custom-named-field-sets)
+  - [4. Mapping onto an Existing Object](#4-mapping-onto-an-existing-object)
+  - [5. Collection Mapping](#5-collection-mapping)
+  - [6. Custom Converter](#6-custom-converter)
+  - [7. CustomMapper Post-Processor](#7-custommapper-post-processor)
+  - [8. FieldFilter](#8-fieldfilter)
+  - [9. Generic Type Mapping](#9-generic-type-mapping)
+- [Code Style Conventions](#code-style-conventions)
 - [API Reference](#api-reference)
 - [Mapping Pipeline](#mapping-pipeline)
 - [Comparison with SAP Hybris DataMapper](#comparison-with-sap-hybris-datamapper)
@@ -45,24 +48,24 @@ When building REST APIs, you typically have two separate object layers:
 - **Service/Data objects** — domain model objects returned by facades or services (e.g. `ProductData`)
 - **WS DTOs** — lean payload objects serialised to JSON/XML (e.g. `ProductWsDTO`)
 
-Manually writing boilerplate mapping code between these layers is tedious and error-prone. This framework automates that process while giving you fine-grained control over *which fields* are included in each response via **field sets** — a core concept from SAP Hybris/Commerce web services.
+Manually writing boilerplate mapping code between these layers is tedious and error-prone. This framework automates that process while giving you fine-grained control over *which fields* are included in each response via **field sets** — a core concept from SAP Hybris/Commerce web services, extended here with support for arbitrary custom names.
 
 ```java
 // Map a ProductData → ProductWsDTO, returning only DEFAULT fields
-ProductWsDTO dto = dataMapper.map(productData, ProductWsDTO.class, "DEFAULT");
+final ProductWsDTO dto = dataMapper.map(productData, ProductWsDTO.class, "DEFAULT");
 
-// Or return the full payload
-ProductWsDTO dto = dataMapper.map(productData, ProductWsDTO.class, "FULL");
+// Or use a custom named set declared on the DTO class
+final ProductWsDTO card = dataMapper.map(productData, ProductWsDTO.class, "SEARCH");
 
 // Or an explicit comma-separated selection
-ProductWsDTO dto = dataMapper.map(productData, ProductWsDTO.class, "code,name,price");
+final ProductWsDTO partial = dataMapper.map(productData, ProductWsDTO.class, "code,name,price");
 ```
 
 ---
 
 ## Key Features
 
-- **Field-Set Filtering** — `BASIC`, `DEFAULT`, `FULL` levels plus explicit field lists and mixed descriptors like `"DEFAULT,description"`
+- **Field-Set Filtering** — `BASIC`, `DEFAULT`, `FULL` levels plus **arbitrary custom named sets**, explicit field lists, and mixed descriptors like `"SEARCH,description"`
 - **Reflection-Based Mapping** — automatic getter → setter matching with a cached method-lookup engine; zero boilerplate for simple cases
 - **Custom Converters** — take full ownership of a source→destination transformation
 - **CustomMapper Post-Processors** — augment or override specific fields after the reflective pass
@@ -93,7 +96,8 @@ ProductWsDTO dto = dataMapper.map(productData, ProductWsDTO.class, "code,name,pr
 │  └──────────────┘  └───────────────────┘  └──────────────────┘ │
 │  ┌──────────────┐  ┌───────────────────┐                        │
 │  │ FieldFilter  │  │  FieldSetBuilder  │                        │
-│  │  Chain       │  │  (with cache)     │                        │
+│  │  Chain       │  │  (built-in +      │                        │
+│  │              │  │   custom names)   │                        │
 │  └──────────────┘  └───────────────────┘                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -147,6 +151,8 @@ public class ProductWsDTO {
 }
 ```
 
+The three built-in levels:
+
 | Level | Description |
 |-------|-------------|
 | `BASIC` | Minimal fields — typically just identifier and display name |
@@ -161,8 +167,52 @@ Field descriptor strings passed to `map()` support several forms:
 | `"BASIC"` | Uses the BASIC field set |
 | `"DEFAULT"` | Uses the DEFAULT field set |
 | `"FULL"` | Uses the FULL field set |
+| `"SEARCH"` | Any custom named set declared on the DTO (see below) |
 | `"code,name,price"` | Explicit comma-separated list |
 | `"DEFAULT,description"` | DEFAULT fields **plus** `description` |
+| `"SEARCH,description"` | Any named set **plus** extra fields |
+
+All set names are **case-insensitive** at resolution time.
+
+---
+
+### Custom Named Field Sets
+
+Beyond the three built-in levels, you can declare any number of **custom named sets** on a DTO class via `@FieldSetDefinition#custom()`. Each entry uses the `@NamedFieldSet` sub-annotation:
+
+```java
+@FieldSetDefinition(
+    basic    = {"code", "name"},
+    defaults = {"code", "name", "price", "available", "stockLevel"},
+    full     = {},
+    custom   = {
+        @NamedFieldSet(name = "SEARCH",   fields = {"code", "name", "categoryNames"}),
+        @NamedFieldSet(name = "CHECKOUT", fields = {"code", "name", "price", "stockLevel"}),
+        @NamedFieldSet(name = "ADMIN",    fields = {})  // empty = ALL fields, like FULL
+    }
+)
+public class ProductWsDTO { ... }
+```
+
+Custom names follow the same rules as built-in levels:
+
+- Names are **case-insensitive** (`"SEARCH"`, `"search"`, and `"Search"` all resolve identically).
+- An **empty `fields` array** is the same sentinel used by `full()` — it means "include every declared field of the class."
+- Custom names **must not shadow** the three reserved names: `BASIC`, `DEFAULT`, `FULL`.
+- Custom names can be **mixed with extra fields** in a descriptor: `"SEARCH,description"` resolves to the SEARCH set plus the `description` field.
+
+This is particularly useful for shaping different API endpoints from a single DTO class:
+
+```java
+// Search result card — minimal
+final ProductWsDTO card = dataMapper.map(product, ProductWsDTO.class, "SEARCH");
+
+// Cart line item — code, name, price, stock
+final ProductWsDTO line = dataMapper.map(product, ProductWsDTO.class, "CHECKOUT");
+
+// Admin export — every field
+final ProductWsDTO export = dataMapper.map(product, ProductWsDTO.class, "ADMIN");
+```
 
 ---
 
@@ -180,13 +230,13 @@ Field descriptor strings passed to `map()` support several forms:
 
 ```java
 // Built automatically by the framework, but you can inspect it in custom components:
-MappingContext ctx = MappingContext.builder()
+final MappingContext ctx = MappingContext.builder()
     .fieldSetName("DEFAULT")
     .mapNulls(false)
     .fieldPrefix("product")
     .build();
 
-boolean include = ctx.includes("price");   // true/false based on field set
+final boolean include = ctx.includes("price");   // true/false based on field set
 ```
 
 ---
@@ -200,8 +250,8 @@ A `Converter<S, D>` takes **full ownership** of producing the destination object
 public class PriceConverter implements Converter<PriceData, PriceWsDTO> {
 
     @Override
-    public PriceWsDTO convert(PriceData source, MappingContext ctx) {
-        PriceWsDTO dto = new PriceWsDTO();
+    public PriceWsDTO convert(final PriceData source, final MappingContext ctx) {
+        final PriceWsDTO dto = new PriceWsDTO();
         dto.setValue(source.getValue().toPlainString());
         dto.setCurrencyIso(source.getCurrencyIso());
         dto.setFormattedValue(String.format("%s %.2f",
@@ -222,7 +272,8 @@ A `CustomMapper<A, B>` is a **post-processor**: it runs *after* the default refl
 public class ProductCustomMapper implements CustomMapper<ProductData, ProductWsDTO> {
 
     @Override
-    public void mapAtoB(ProductData source, ProductWsDTO dest, MappingContext ctx) {
+    public void mapAtoB(final ProductData source, final ProductWsDTO dest,
+                        final MappingContext ctx) {
         // Runs after reflection; handle the price field (BigDecimal → String)
         if (ctx.includes("price") && source.getBasePrice() != null) {
             dest.setPrice(String.format("%s %.2f",
@@ -231,10 +282,11 @@ public class ProductCustomMapper implements CustomMapper<ProductData, ProductWsD
     }
 
     @Override
-    public void mapBtoA(ProductWsDTO source, ProductData dest, MappingContext ctx) {
+    public void mapBtoA(final ProductWsDTO source, final ProductData dest,
+                        final MappingContext ctx) {
         // Optional reverse direction
         if (source.getPrice() != null) {
-            String[] parts = source.getPrice().split(" ");
+            final String[] parts = source.getPrice().split(" ");
             if (parts.length == 2) {
                 dest.setBasePrice(new BigDecimal(parts[1]));
                 dest.setCurrencyIso(parts[0]);
@@ -255,13 +307,14 @@ A `FieldFilter` is consulted for every field *after* the field-set check passes.
 public class EmptyCollectionFilter implements FieldFilter {
 
     @Override
-    public boolean isApplicable(Class<?> sourceType, Class<?> destType) {
+    public boolean isApplicable(final Class<?> sourceType, final Class<?> destType) {
         return true; // apply globally
     }
 
     @Override
-    public boolean include(String fieldName, Object value, MappingContext ctx) {
-        if (value instanceof Collection<?> col) {
+    public boolean include(final String fieldName, final Object value,
+                           final MappingContext ctx) {
+        if (value instanceof final Collection<?> col) {
             return !col.isEmpty(); // skip empty collections
         }
         return true;
@@ -276,7 +329,7 @@ public class EmptyCollectionFilter implements FieldFilter {
 Mark any `Converter`, `CustomMapper`, or `FieldFilter` bean with `@WsDTOMapping` and register it in one call:
 
 ```java
-DefaultDataMapper dataMapper = new DefaultDataMapper();
+final DefaultDataMapper dataMapper = new DefaultDataMapper();
 
 dataMapper.registerBeans(List.of(
     new ProductCustomMapper(),
@@ -292,9 +345,8 @@ dataMapper.registerBeans(List.of(
 public class MappingConfig {
 
     @Bean
-    public DefaultDataMapper dataMapper(ApplicationContext ctx) {
-        DefaultDataMapper mapper = new DefaultDataMapper();
-        // Collect all @WsDTOMapping beans from the context
+    public DefaultDataMapper dataMapper(final ApplicationContext ctx) {
+        final DefaultDataMapper mapper = new DefaultDataMapper();
         mapper.registerBeans(ctx.getBeansWithAnnotation(WsDTOMapping.class).values());
         return mapper;
     }
@@ -318,16 +370,16 @@ dataMapper.addFilter(new EmptyCollectionFilter());
 The simplest usage — reflective field matching with no field-set filtering (maps everything):
 
 ```java
-DefaultDataMapper dataMapper = new DefaultDataMapper();
+final DefaultDataMapper dataMapper = new DefaultDataMapper();
 
-ProductData source = new ProductData();
+final ProductData source = new ProductData();
 source.setCode("P001");
 source.setName("Laptop Pro");
 source.setDescription("High-end laptop");
 source.setStockLevel(42);
 
 // Create and return a new ProductWsDTO
-ProductWsDTO dto = dataMapper.map(source, ProductWsDTO.class);
+final ProductWsDTO dto = dataMapper.map(source, ProductWsDTO.class);
 
 System.out.println(dto.getCode());   // "P001"
 System.out.println(dto.getName());   // "Laptop Pro"
@@ -339,38 +391,84 @@ System.out.println(dto.getName());   // "Laptop Pro"
 
 ```java
 // BASIC: only code and name are mapped
-ProductWsDTO basic = dataMapper.map(source, ProductWsDTO.class, "BASIC");
+final ProductWsDTO basic = dataMapper.map(source, ProductWsDTO.class, "BASIC");
 // basic.getDescription() == null  ✓
 
 // DEFAULT: code, name, price, available, stockLevel
-ProductWsDTO defaults = dataMapper.map(source, ProductWsDTO.class, "DEFAULT");
+final ProductWsDTO defaults = dataMapper.map(source, ProductWsDTO.class, "DEFAULT");
 // defaults.getStockLevel() == 42  ✓
 
 // FULL: every field
-ProductWsDTO full = dataMapper.map(source, ProductWsDTO.class, "FULL");
+final ProductWsDTO full = dataMapper.map(source, ProductWsDTO.class, "FULL");
 // full.getDescription() == "High-end laptop"  ✓
 
 // Explicit field list
-ProductWsDTO partial = dataMapper.map(source, ProductWsDTO.class, "code,description");
+final ProductWsDTO partial = dataMapper.map(source, ProductWsDTO.class, "code,description");
 // partial.getCode() == "P001"         ✓
 // partial.getName() == null           ✓  (not in list)
 // partial.getDescription() == "..."   ✓
 
 // Mix: level + extra field
-ProductWsDTO mixed = dataMapper.map(source, ProductWsDTO.class, "DEFAULT,description");
+final ProductWsDTO mixed = dataMapper.map(source, ProductWsDTO.class, "DEFAULT,description");
 // Gets all DEFAULT fields PLUS description
 ```
 
 ---
 
-### 3. Mapping onto an Existing Object
+### 3. Custom Named Field Sets
+
+Custom sets are declared once on the DTO and used freely from anywhere in the application:
 
 ```java
-ProductWsDTO existing = new ProductWsDTO();
+@FieldSetDefinition(
+    basic    = {"code", "name"},
+    defaults = {"code", "name", "price", "available", "stockLevel"},
+    full     = {},
+    custom   = {
+        @NamedFieldSet(name = "SEARCH",   fields = {"code", "name", "categoryNames"}),
+        @NamedFieldSet(name = "CHECKOUT", fields = {"code", "name", "price", "stockLevel"}),
+        @NamedFieldSet(name = "ADMIN",    fields = {})  // empty = ALL fields
+    }
+)
+public class ProductWsDTO { ... }
+```
+
+Used at the call site:
+
+```java
+// Search result card with category breadcrumbs
+final ProductWsDTO card = dataMapper.map(product, ProductWsDTO.class, "SEARCH");
+// card.getCode(), card.getName(), card.getCategoryNames() are populated
+// All other fields (description, manufacturerName, imageUrl) are null
+
+// Cart line item — focused on what the cart needs
+final ProductWsDTO line = dataMapper.map(product, ProductWsDTO.class, "CHECKOUT");
+
+// Admin export — empty fields {} = all fields
+final ProductWsDTO export = dataMapper.map(product, ProductWsDTO.class, "ADMIN");
+
+// Custom set + extra field
+final ProductWsDTO enriched = dataMapper.map(product, ProductWsDTO.class, "SEARCH,description");
+
+// Case-insensitive
+final ProductWsDTO same = dataMapper.map(product, ProductWsDTO.class, "search");  // works
+```
+
+**When to use custom sets vs. explicit field lists:**
+
+- Use **custom sets** when the same combination of fields is reused across multiple endpoints — declare it once, change it once.
+- Use **explicit field lists** for one-off API endpoints or ad-hoc queries.
+
+---
+
+### 4. Mapping onto an Existing Object
+
+```java
+final ProductWsDTO existing = new ProductWsDTO();
 existing.setCode("OLD");
 existing.setDescription("preserved description");
 
-ProductData update = new ProductData();
+final ProductData update = new ProductData();
 update.setCode("P002");
 update.setName("Gaming Mouse");
 
@@ -387,27 +485,27 @@ dataMapper.map(update, existing, "FULL", /* mapNulls= */ false);
 
 ---
 
-### 4. Collection Mapping
+### 5. Collection Mapping
 
 ```java
-List<ProductData> products = productFacade.getProductsForCategory("electronics");
+final List<ProductData> products = productFacade.getProductsForCategory("electronics");
 
 // Map to List
-List<ProductWsDTO> dtoList =
+final List<ProductWsDTO> dtoList =
     dataMapper.mapAsList(products, ProductWsDTO.class, "DEFAULT");
 
 // Map to Set (deduplicates)
-Set<ProductWsDTO> dtoSet =
+final Set<ProductWsDTO> dtoSet =
     dataMapper.mapAsSet(products, ProductWsDTO.class, "BASIC");
 
 // Append into an existing collection
-List<ProductWsDTO> accumulator = new ArrayList<>();
-dataMapper.mapAsCollection(products, accumulator, ProductWsDTO.class, "DEFAULT");
+final List<ProductWsDTO> accumulator = new ArrayList<>();
+dataMapper.mapAsCollection(products, accumulator, ProductWsDTO.class, "SEARCH");
 ```
 
 ---
 
-### 5. Custom Converter
+### 6. Custom Converter
 
 When you need full control over how a destination object is built (e.g. complex type transformations or calculated fields):
 
@@ -416,8 +514,8 @@ When you need full control over how a destination object is built (e.g. complex 
 public class CategoryConverter implements Converter<CategoryData, CategoryWsDTO> {
 
     @Override
-    public CategoryWsDTO convert(CategoryData source, MappingContext ctx) {
-        CategoryWsDTO dto = new CategoryWsDTO();
+    public CategoryWsDTO convert(final CategoryData source, final MappingContext ctx) {
+        final CategoryWsDTO dto = new CategoryWsDTO();
         dto.setCode(source.getCode().toLowerCase());
         dto.setName(source.getName());
         dto.setUrl("/categories/" + source.getCode());
@@ -432,13 +530,13 @@ public class CategoryConverter implements Converter<CategoryData, CategoryWsDTO>
 // Register and use
 dataMapper.addConverter(new CategoryConverter());
 
-CategoryWsDTO dto = dataMapper.map(categoryData, CategoryWsDTO.class, "DEFAULT,productCount");
+final CategoryWsDTO dto = dataMapper.map(categoryData, CategoryWsDTO.class, "DEFAULT,productCount");
 System.out.println(dto.getUrl()); // "/categories/electronics"
 ```
 
 ---
 
-### 6. CustomMapper Post-Processor
+### 7. CustomMapper Post-Processor
 
 Ideal when most fields map 1-to-1 by name, but a few need special handling:
 
@@ -447,7 +545,8 @@ Ideal when most fields map 1-to-1 by name, but a few need special handling:
 public class OrderCustomMapper implements CustomMapper<OrderData, OrderWsDTO> {
 
     @Override
-    public void mapAtoB(OrderData source, OrderWsDTO dest, MappingContext ctx) {
+    public void mapAtoB(final OrderData source, final OrderWsDTO dest,
+                        final MappingContext ctx) {
         // The reflection engine already copied matching fields.
         // Handle the fields that need custom logic:
 
@@ -465,7 +564,7 @@ public class OrderCustomMapper implements CustomMapper<OrderData, OrderWsDTO> {
 
 ---
 
-### 7. FieldFilter
+### 8. FieldFilter
 
 Use filters to apply cross-cutting rules across all mappings — for example, removing sensitive fields in non-admin contexts:
 
@@ -478,13 +577,14 @@ public class SensitiveFieldFilter implements FieldFilter {
     );
 
     @Override
-    public boolean isApplicable(Class<?> sourceType, Class<?> destType) {
+    public boolean isApplicable(final Class<?> sourceType, final Class<?> destType) {
         return true;
     }
 
     @Override
-    public boolean include(String fieldName, Object value, MappingContext ctx) {
-        boolean isAdmin = Boolean.TRUE.equals(ctx.get("isAdmin"));
+    public boolean include(final String fieldName, final Object value,
+                           final MappingContext ctx) {
+        final boolean isAdmin = Boolean.TRUE.equals(ctx.get("isAdmin"));
         if (SENSITIVE.contains(fieldName) && !isAdmin) {
             return false; // strip sensitive fields for non-admin callers
         }
@@ -493,7 +593,7 @@ public class SensitiveFieldFilter implements FieldFilter {
 }
 
 // Usage: pass extra context attributes
-MappingContext ctx = MappingContext.builder()
+final MappingContext ctx = MappingContext.builder()
     .fieldSetName("FULL")
     .extra("isAdmin", userHasAdminRole())
     .build();
@@ -501,7 +601,7 @@ MappingContext ctx = MappingContext.builder()
 
 ---
 
-### 8. Generic Type Mapping
+### 9. Generic Type Mapping
 
 For paginated responses or other parameterised wrapper types:
 
@@ -509,7 +609,7 @@ For paginated responses or other parameterised wrapper types:
 // Source: ProductSearchPageData<SearchStateData, ProductData>
 // Dest:   ProductSearchPageWsDTO<SearchStateWsDTO, ProductWsDTO>
 
-ProductSearchPageWsDTO<SearchStateWsDTO, ProductWsDTO> dest =
+final ProductSearchPageWsDTO<SearchStateWsDTO, ProductWsDTO> dest =
     new ProductSearchPageWsDTO<>();
 
 dataMapper.mapGeneric(
@@ -524,41 +624,114 @@ dataMapper.mapGeneric(
 
 ---
 
+## Code Style Conventions
+
+The framework follows a few conventions consistently across its codebase. Contributors are expected to honour them:
+
+**`final` everywhere applicable.** All method parameters and all local variables that are not reassigned are declared `final`. This protects against accidental mutation, communicates intent, and makes the code safer to refactor.
+
+```java
+public <S, D> D map(final S source, final Class<D> destClass, final String fields) {
+    final Set<String> resolved = FieldSetBuilder.resolve(destClass, fields);
+    final MappingContext ctx = MappingContext.builder()
+            .fieldSetName(fields != null ? fields : "DEFAULT")
+            .resolvedFields(resolved)
+            .build();
+    return doMap(source, destClass, ctx);
+}
+```
+
+**Lambdas and streams over imperative loops.** Where a `for` loop is purely transformative, the implementation prefers a stream pipeline. Readability and intent come first — loops remain in the rare cases where they are genuinely clearer.
+
+```java
+// Filter chain — lambda form
+private boolean passFilters(final List<FieldFilter> filters, final String fieldName,
+                            final Object value, final MappingContext ctx,
+                            final Class<?> src, final Class<?> dest) {
+    return filters.stream()
+            .noneMatch(filter ->
+                    filter.isApplicable(src, dest) && !filter.include(fieldName, value, ctx));
+}
+```
+
+```java
+// Bean auto-registration — stream + pattern matching
+public void registerBeans(final Iterable<?> beans) {
+    StreamSupport.stream(beans.spliterator(), false)
+            .filter(bean -> bean.getClass().isAnnotationPresent(WsDTOMapping.class))
+            .forEach(bean -> {
+                if (bean instanceof final Converter<?, ?> c) {
+                    registry.registerConverter(c);
+                } else if (bean instanceof final CustomMapper<?, ?> m) {
+                    registry.registerMapper(m);
+                } else if (bean instanceof final FieldFilter f) {
+                    registry.registerFilter(f);
+                }
+            });
+}
+```
+
+**Pattern matching for `instanceof`.** When a type check is followed by a cast, use Java 16+ pattern matching with a `final` binding variable:
+
+```java
+if (value instanceof final Collection<?> col) {
+    return !col.isEmpty();
+}
+```
+
+---
+
 ## API Reference
 
 ### DataMapper Interface
 
 ```java
 // Create & return (new destination instance)
-<S, D> D map(S source, Class<D> dest)
-<S, D> D map(S source, Class<D> dest, String fields)
-<S, D> D map(S source, Class<D> dest, Set<String> fields)
+<S, D> D map(final S source, final Class<D> dest)
+<S, D> D map(final S source, final Class<D> dest, final String fields)
+<S, D> D map(final S source, final Class<D> dest, final Set<String> fields)
 
 // Map onto existing instance
-<S, D> void map(S source, D dest)
-<S, D> void map(S source, D dest, boolean mapNulls)
-<S, D> void map(S source, D dest, String fields)
-<S, D> void map(S source, D dest, String fields, boolean mapNulls)
+<S, D> void map(final S source, final D dest)
+<S, D> void map(final S source, final D dest, final boolean mapNulls)
+<S, D> void map(final S source, final D dest, final String fields)
+<S, D> void map(final S source, final D dest, final String fields, final boolean mapNulls)
 
 // Generic (parameterized) types
-<S, D> void mapGeneric(S source, D dest,
-                       Type[] sourceTypeArgs, Type[] destTypeArgs,
-                       String fields, Map<String, Class<?>> destTypeVariableMap)
+<S, D> void mapGeneric(final S source, final D dest,
+                       final Type[] sourceTypeArgs, final Type[] destTypeArgs,
+                       final String fields, final Map<String, Class<?>> destTypeVariableMap)
 
 // Collections
-<S, D> List<D>  mapAsList(Iterable<S> source, Class<D> dest, String fields)
-<S, D> Set<D>   mapAsSet(Iterable<S> source, Class<D> dest, String fields)
-<S, D> void     mapAsCollection(Iterable<S> source, Collection<D> dest,
-                                Class<D> destClass, String fields)
+<S, D> List<D>  mapAsList(final Iterable<S> source, final Class<D> dest, final String fields)
+<S, D> Set<D>   mapAsSet(final Iterable<S> source, final Class<D> dest, final String fields)
+<S, D> void     mapAsCollection(final Iterable<S> source, final Collection<D> dest,
+                                final Class<D> destClass, final String fields)
 ```
 
 ### DefaultDataMapper Registration
 
 ```java
-void registerBeans(Iterable<?> beans)    // auto-discovers @WsDTOMapping
-void addConverter(Converter<?, ?> c)
-void addMapper(CustomMapper<?, ?> m)
-void addFilter(FieldFilter f)
+void registerBeans(final Iterable<?> beans)    // auto-discovers @WsDTOMapping
+void addConverter(final Converter<?, ?> c)
+void addMapper(final CustomMapper<?, ?> m)
+void addFilter(final FieldFilter f)
+```
+
+### Field Set Annotations
+
+```java
+@FieldSetDefinition(
+    basic    = String[],         // BASIC level fields
+    defaults = String[],         // DEFAULT level fields
+    full     = String[],         // FULL level fields ({} = all class fields)
+    custom   = NamedFieldSet[]   // any number of custom named sets
+)
+
+@NamedFieldSet(
+    name   = String,             // case-insensitive; cannot be BASIC/DEFAULT/FULL
+    fields = String[]            // {} = all class fields, like full()
+)
 ```
 
 ---
@@ -572,7 +745,8 @@ Input: sourceObject, destinationClass, fields, mapNulls
   │
   ▼
 1. FieldSetBuilder.resolve(destClass, fields)
-   → Produces Set<String> of allowed field names
+   → Tokenises descriptor, looks up each token in the unified
+     name-map (built-in + custom sets), produces Set<String>
   │
   ▼
 2. MappingContext built with fieldSet, mapNulls flag, resolved fields
@@ -602,6 +776,8 @@ Input: sourceObject, destinationClass, fields, mapNulls
 Output: populated destination object
 ```
 
+The `FieldSetBuilder` cache is a unified `Map<Class<?>, Map<String, Set<String>>>` keyed by upper-cased set name. Built-in levels and custom names share the same map, so resolution is a single `O(1)` lookup regardless of which kind is requested.
+
 ---
 
 ## Comparison with SAP Hybris DataMapper
@@ -611,7 +787,8 @@ Output: populated destination object
 | Core interface | `de.hybris.platform.webservicescommons.mapping.DataMapper` | `com.framework.mapping.DataMapper` |
 | Default impl | `DefaultDataMapper extends ConfigurableMapper` | `DefaultDataMapper` (pure reflection) |
 | Mapping engine | Orika (`MapperFacade`) | Custom reflection engine |
-| Field-set filtering | ✅ `FIELD_SET_NAME` context key | ✅ `@FieldSetDefinition` + descriptor strings |
+| Built-in field-set levels | ✅ `BASIC`, `DEFAULT`, `FULL` | ✅ `BASIC`, `DEFAULT`, `FULL` |
+| **Custom named field sets** | ❌ Not supported out of the box | ✅ `@NamedFieldSet` inside `@FieldSetDefinition#custom()` |
 | Auto-discovery | ✅ `@WsDTOMapping` + Spring context | ✅ `@WsDTOMapping` + `registerBeans()` |
 | Custom converters | ✅ Orika `Converter` | ✅ `Converter<S,D>` |
 | Custom mappers | ✅ Orika `Mapper` | ✅ `CustomMapper<A,B>` |
@@ -644,7 +821,8 @@ datamapper/
     │   │   └── FieldFilter.java               # Per-field exclusion interface
     │   ├── fieldset/
     │   │   ├── FieldLevel.java                # BASIC / DEFAULT / FULL enum
-    │   │   ├── FieldSetDefinition.java        # @FieldSetDefinition annotation
+    │   │   ├── FieldSetDefinition.java        # @FieldSetDefinition (basic/defaults/full/custom)
+    │   │   ├── NamedFieldSet.java             # @NamedFieldSet for custom named sets
     │   │   └── FieldSetBuilder.java           # Resolves field sets with caching
     │   └── impl/
     │       ├── DefaultDataMapper.java         # Main implementation
@@ -653,10 +831,10 @@ datamapper/
     │       └── MappingException.java          # Unchecked runtime exception
     └── test/java/com/framework/mapping/
         └── test/
-            ├── DataMapperTest.java            # 18 JUnit 5 tests
+            ├── DataMapperTest.java            # 23 JUnit 5 tests
             ├── domain/
             │   ├── ProductData.java           # Service-layer domain object
-            │   └── ProductWsDTO.java          # WS DTO with @FieldSetDefinition
+            │   └── ProductWsDTO.java          # WS DTO with @FieldSetDefinition + custom sets
             └── mappers/
                 ├── ProductPriceMapper.java    # CustomMapper example
                 └── NullCollectionFilter.java  # FieldFilter example
@@ -673,20 +851,42 @@ mvn test
 Expected output:
 
 ```
-[INFO] Tests run: 18, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 23, Failures: 0, Errors: 0, Skipped: 0
 ```
 
 The test suite covers:
 
+**Built-in field sets**
 - `BASIC` / `DEFAULT` / `FULL` field-set filtering
-- Explicit field lists and mixed descriptors (`"DEFAULT,description"`)
+- `null` field descriptor defaults to `DEFAULT`
+- Explicit field lists (`"code,description"`)
+- Mixed descriptors (`"DEFAULT,description"`)
 - `Set<String>` field selection
-- `CustomMapper` post-processing (price formatting)
-- Mapping onto an existing object
+
+**Custom named field sets**
+- Custom `SEARCH` set returns only declared fields
+- Custom `CHECKOUT` set restricts to its declared fields
+- Custom `ADMIN` set with empty `fields = {}` behaves like `FULL`
+- Custom set combined with extras (`"SEARCH,description"`)
+- Case-insensitive name resolution (`"SEARCH"` ≡ `"search"` ≡ `"Search"`)
+
+**CustomMapper post-processing**
+- Price formatting (`BigDecimal` → `"EUR 1299.99"` string)
+- CustomMapper not invoked for fields outside the active field set
+
+**Mapping onto existing objects**
+- Only fields in the active set are updated
 - `mapNulls=false` — null does not overwrite destination
 - `mapNulls=true` — null overwrites destination
+
+**Collections**
 - `mapAsList`, `mapAsSet`, `mapAsCollection`
-- `FieldFilter` (empty collections excluded)
+
+**FieldFilter**
+- Empty collections excluded
+- Non-empty collections passed through
+
+**Edge cases**
 - Zero-value primitives mapped correctly
 
 ---
@@ -701,7 +901,7 @@ Contributions are welcome! Please open an issue to discuss your idea before subm
 4. Push to the branch: `git push origin feature/my-feature`
 5. Open a Pull Request
 
-Please ensure all tests pass (`mvn test`) and add new tests for any new behaviour.
+Please ensure all tests pass (`mvn test`) and add new tests for any new behaviour. Match the existing code style: `final` on parameters and unreassigned locals, lambdas/streams over imperative loops, and pattern matching for `instanceof`.
 
 ---
 
