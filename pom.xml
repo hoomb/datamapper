@@ -53,10 +53,6 @@
     </dependencies>
 
     <profiles>
-        <!--
-        mvn -P release -DignoreSnapshots=true release:clean release:prepare
-        mvn -P release release:perform
-        -->
         <profile>
             <id>release</id>
             <activation>

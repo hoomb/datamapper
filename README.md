@@ -111,6 +111,18 @@ final ProductWsDTO partial = dataMapper.map(productData, ProductWsDTO.class, "co
 - Java 17+
 - Maven 3.6+ (or compile manually — no external runtime dependencies)
 
+### Install
+
+```xml
+<dependency>
+    <groupId>de.hoomit.projects</groupId>
+    <artifactId>datamapper</artifactId>
+    <version>1.1.1</version>
+</dependency>
+```
+
+## OR
+
 ### Build
 
 ```bash
