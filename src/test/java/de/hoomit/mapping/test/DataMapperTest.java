@@ -55,7 +55,7 @@ class DataMapperTest {
     // =========================================================================
 
     private ProductData fullProduct() {
-        final ProductData p = new ProductData();
+        ProductData p = new ProductData();
         p.setCode("P001");
         p.setName("Laptop Pro");
         p.setDescription("High-end laptop for professionals");
@@ -77,7 +77,7 @@ class DataMapperTest {
     @Order(1)
     @DisplayName("BASIC field set: only code and name are mapped")
     void testBasicFieldSet() {
-        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "BASIC");
+        ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "BASIC");
 
         assertEquals("P001", dto.getCode());
         assertEquals("Laptop Pro", dto.getName());
@@ -90,7 +90,7 @@ class DataMapperTest {
     @Order(2)
     @DisplayName("DEFAULT field set: code, name, price, available, stockLevel")
     void testDefaultFieldSet() {
-        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "DEFAULT");
+        ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "DEFAULT");
 
         assertEquals("P001", dto.getCode());
         assertEquals("Laptop Pro", dto.getName());
@@ -104,7 +104,7 @@ class DataMapperTest {
     @Order(3)
     @DisplayName("FULL field set: all fields including description and manufacturer")
     void testFullFieldSet() {
-        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "FULL");
+        ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "FULL");
 
         assertEquals("P001", dto.getCode());
         assertEquals("Laptop Pro", dto.getName());
@@ -119,7 +119,7 @@ class DataMapperTest {
     @Order(4)
     @DisplayName("null fields string defaults to DEFAULT")
     void testNullFieldsDefaultsToDefault() {
-        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, (String) null);
+        ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, (String) null);
         // Same as DEFAULT
         assertNotNull(dto.getCode());
         assertNull(dto.getDescription());
@@ -133,7 +133,7 @@ class DataMapperTest {
     @Order(5)
     @DisplayName("Explicit field list: 'code,description' only those two fields")
     void testExplicitFieldList() {
-        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "code,description");
+        ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "code,description");
 
         assertEquals("P001", dto.getCode());
         assertEquals("High-end laptop for professionals", dto.getDescription());
@@ -145,7 +145,7 @@ class DataMapperTest {
     @Order(6)
     @DisplayName("Mixed field string: 'DEFAULT,description' adds description to DEFAULT")
     void testMixedLevelPlusExtra() {
-        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "DEFAULT,description");
+        ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "DEFAULT,description");
 
         assertNotNull(dto.getCode());
         assertNotNull(dto.getPrice());
@@ -156,8 +156,8 @@ class DataMapperTest {
     @Order(7)
     @DisplayName("Set<String> field selection")
     void testSetFieldSelection() {
-        final Set<String> fields = new LinkedHashSet<>(Arrays.asList("code", "name", "stockLevel"));
-        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, fields);
+        Set<String> fields = new LinkedHashSet<>(Arrays.asList("code", "name", "stockLevel"));
+        ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, fields);
 
         assertEquals("P001", dto.getCode());
         assertEquals("Laptop Pro", dto.getName());
@@ -184,7 +184,7 @@ class DataMapperTest {
     @Order(9)
     @DisplayName("Price field excluded from BASIC: CustomMapper is not called for it")
     void testCustomMapperSkippedForBasic() {
-        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "BASIC");
+        ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "BASIC");
         assertNull(dto.getPrice(), "price field excluded by BASIC field set");
     }
 
@@ -196,11 +196,11 @@ class DataMapperTest {
     @Order(10)
     @DisplayName("map onto existing object: only updates matching fields")
     void testMapOntoExistingObject() {
-        final ProductWsDTO existing = new ProductWsDTO();
+        ProductWsDTO existing = new ProductWsDTO();
         existing.setCode("OLD");
         existing.setDescription("should stay");
 
-        final ProductData source = new ProductData();
+        ProductData source = new ProductData();
         source.setCode("P002");
         source.setName("Mouse");
         source.setAvailable(true);
@@ -217,10 +217,10 @@ class DataMapperTest {
     @Order(11)
     @DisplayName("mapNulls=false: null source value does not overwrite dest field")
     void testMapNullsFalse() {
-        final ProductWsDTO dest = new ProductWsDTO();
+        ProductWsDTO dest = new ProductWsDTO();
         dest.setName("Original");
 
-        final ProductData source = new ProductData();
+        ProductData source = new ProductData();
         source.setCode("X");
         source.setName(null);   // null!
 
@@ -234,10 +234,10 @@ class DataMapperTest {
     @Order(12)
     @DisplayName("mapNulls=true: null source value DOES overwrite dest field")
     void testMapNullsTrue() {
-        final ProductWsDTO dest = new ProductWsDTO();
+        ProductWsDTO dest = new ProductWsDTO();
         dest.setName("Original");
 
-        final ProductData source = new ProductData();
+        ProductData source = new ProductData();
         source.setCode("X");
         source.setName(null);
 
@@ -254,14 +254,14 @@ class DataMapperTest {
     @Order(13)
     @DisplayName("mapAsList: maps a list of ProductData to List<ProductWsDTO>")
     void testMapAsList() {
-        final ProductData p1 = new ProductData();
+        ProductData p1 = new ProductData();
         p1.setCode("A");
         p1.setName("Alpha");
-        final ProductData p2 = new ProductData();
+        ProductData p2 = new ProductData();
         p2.setCode("B");
         p2.setName("Beta");
 
-        final List<ProductWsDTO> dtos = dataMapper.mapAsList(List.of(p1, p2), ProductWsDTO.class, "BASIC");
+        List<ProductWsDTO> dtos = dataMapper.mapAsList(List.of(p1, p2), ProductWsDTO.class, "BASIC");
 
         assertEquals(2, dtos.size());
         assertEquals("A", dtos.get(0).getCode());
@@ -272,12 +272,12 @@ class DataMapperTest {
     @Order(14)
     @DisplayName("mapAsSet: result is a Set with no duplicates")
     void testMapAsSet() {
-        final ProductData p1 = new ProductData();
+        ProductData p1 = new ProductData();
         p1.setCode("A");
-        final ProductData p2 = new ProductData();
+        ProductData p2 = new ProductData();
         p2.setCode("B");
 
-        final Set<ProductWsDTO> dtos = dataMapper.mapAsSet(List.of(p1, p2), ProductWsDTO.class, "BASIC");
+        Set<ProductWsDTO> dtos = dataMapper.mapAsSet(List.of(p1, p2), ProductWsDTO.class, "BASIC");
         assertEquals(2, dtos.size());
     }
 
@@ -285,12 +285,12 @@ class DataMapperTest {
     @Order(15)
     @DisplayName("mapAsCollection: appends into an existing collection")
     void testMapAsCollection() {
-        final ProductData p1 = new ProductData();
+        ProductData p1 = new ProductData();
         p1.setCode("A");
-        final ProductData p2 = new ProductData();
+        ProductData p2 = new ProductData();
         p2.setCode("B");
 
-        final List<ProductWsDTO> dest = new ArrayList<>();
+        List<ProductWsDTO> dest = new ArrayList<>();
         dest.add(new ProductWsDTO()); // pre-existing item
         dataMapper.mapAsCollection(List.of(p1, p2), dest, ProductWsDTO.class, "BASIC");
 
@@ -306,10 +306,10 @@ class DataMapperTest {
     @Order(16)
     @DisplayName("NullCollectionFilter: empty category list is excluded from output")
     void testNullCollectionFilter() {
-        final ProductData source = fullProduct();
+        ProductData source = fullProduct();
         source.setCategoryNames(Collections.emptyList()); // empty list
 
-        final ProductWsDTO dto = dataMapper.map(source, ProductWsDTO.class, "FULL");
+        ProductWsDTO dto = dataMapper.map(source, ProductWsDTO.class, "FULL");
 
         assertNull(dto.getCategoryNames(),
                 "Empty collection should be excluded by NullCollectionFilter");
@@ -319,10 +319,10 @@ class DataMapperTest {
     @Order(17)
     @DisplayName("NullCollectionFilter: non-empty list is included normally")
     void testNonEmptyCollectionNotFiltered() {
-        final ProductData source = fullProduct();
+        ProductData source = fullProduct();
         // categoryNames = ["Electronics", "Computers"]
 
-        final ProductWsDTO dto = dataMapper.map(source, ProductWsDTO.class, "FULL");
+        ProductWsDTO dto = dataMapper.map(source, ProductWsDTO.class, "FULL");
 
         assertNotNull(dto.getCategoryNames());
         assertEquals(2, dto.getCategoryNames().size());
@@ -409,14 +409,136 @@ class DataMapperTest {
     @Order(18)
     @DisplayName("Map product with zero stock: zero int is mapped correctly")
     void testZeroIntMapped() {
-        final ProductData source = new ProductData();
+        ProductData source = new ProductData();
         source.setCode("Z");
         source.setStockLevel(0);
         source.setAvailable(false);
 
-        final ProductWsDTO dto = dataMapper.map(source, ProductWsDTO.class, "DEFAULT");
+        ProductWsDTO dto = dataMapper.map(source, ProductWsDTO.class, "DEFAULT");
 
         assertEquals(0, dto.getStockLevel());
         assertFalse(dto.isAvailable());
+    }
+
+    // =========================================================================
+    // Cumulative field-set definitions (NEW)
+    // =========================================================================
+
+    @Test
+    @Order(24)
+    @DisplayName("Cumulative: DEFAULT inherits BASIC's fields ({BASIC, price, available, stockLevel})")
+    void testCumulativeDefaultIncludesBasic() {
+        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "DEFAULT");
+
+        // From BASIC
+        assertEquals("P001", dto.getCode());
+        assertEquals("Laptop Pro", dto.getName());
+        // From DEFAULT's own additions
+        assertEquals(42, dto.getStockLevel());
+        assertTrue(dto.isAvailable());
+        assertNotNull(dto.getPrice(), "price added by DEFAULT (via CustomMapper)");
+        // Outside DEFAULT
+        assertNull(dto.getDescription());
+    }
+
+    @Test
+    @Order(25)
+    @DisplayName("Cumulative: custom SEARCH inherits BASIC ({BASIC, categoryNames})")
+    void testCumulativeSearchIncludesBasic() {
+        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "SEARCH");
+
+        assertEquals("P001", dto.getCode(), "from BASIC");
+        assertEquals("Laptop Pro", dto.getName(), "from BASIC");
+        assertNotNull(dto.getCategoryNames(), "from SEARCH itself");
+        assertNull(dto.getDescription(), "not in SEARCH");
+        assertNull(dto.getPrice(), "not in SEARCH");
+    }
+
+    @Test
+    @Order(26)
+    @DisplayName("Cumulative transitive: MOBILE → SEARCH → BASIC produces {code, name, categoryNames, stockLevel}")
+    void testCumulativeTransitive() {
+        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "MOBILE");
+
+        assertEquals("P001", dto.getCode(), "from BASIC (transitively)");
+        assertEquals("Laptop Pro", dto.getName(), "from BASIC (transitively)");
+        assertNotNull(dto.getCategoryNames(), "from SEARCH");
+        assertEquals(42, dto.getStockLevel(), "from MOBILE itself");
+        assertNull(dto.getDescription(), "not in MOBILE chain");
+        assertNull(dto.getPrice(), "not in MOBILE chain");
+    }
+
+    @Test
+    @Order(27)
+    @DisplayName("Cumulative: CHECKOUT inherits BASIC ({BASIC, price, stockLevel})")
+    void testCumulativeCheckoutIncludesBasic() {
+        final ProductWsDTO dto = dataMapper.map(fullProduct(), ProductWsDTO.class, "CHECKOUT");
+
+        assertEquals("P001", dto.getCode());
+        assertEquals("Laptop Pro", dto.getName());
+        assertEquals(42, dto.getStockLevel());
+        assertNotNull(dto.getPrice());
+        assertNull(dto.getDescription());
+        assertFalse(dto.isAvailable(), "available not in CHECKOUT");
+    }
+
+    // =========================================================================
+    // Error handling for malformed field-set definitions
+    // =========================================================================
+
+    @Test
+    @Order(28)
+    @DisplayName("Cyclic field-set definition throws IllegalStateException")
+    void testCyclicReferenceDetected() {
+        final de.hoomit.mapping.test.domain.CyclicFieldSetDTO src
+                = new de.hoomit.mapping.test.domain.CyclicFieldSetDTO();
+        src.setCode("X");
+        src.setName("Y");
+
+        final IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> dataMapper.map(src,
+                        de.hoomit.mapping.test.domain.CyclicFieldSetDTO.class,
+                        "DEFAULT"));
+
+        assertTrue(ex.getMessage().contains("Circular"),
+                "Error message should mention circular reference; got: " + ex.getMessage());
+    }
+
+    @Test
+    @Order(29)
+    @DisplayName("Unknown reference throws IllegalStateException with helpful message")
+    void testUnknownReferenceDetected() {
+        final de.hoomit.mapping.test.domain.UnknownRefDTO src
+                = new de.hoomit.mapping.test.domain.UnknownRefDTO();
+        src.setCode("X");
+        src.setName("Y");
+
+        final IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> dataMapper.map(src,
+                        de.hoomit.mapping.test.domain.UnknownRefDTO.class,
+                        "DEFAULT"));
+
+        assertTrue(ex.getMessage().contains("Unknown field-set reference"),
+                "Error message should mention unknown reference; got: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("@DOESNOTEXIST"),
+                "Error message should include the bad token");
+    }
+
+    @Test
+    @Order(30)
+    @DisplayName("Custom name shadowing reserved level throws IllegalStateException")
+    void testReservedNameShadowingDetected() {
+        final de.hoomit.mapping.test.domain.ReservedNameDTO src
+                = new de.hoomit.mapping.test.domain.ReservedNameDTO();
+        src.setCode("X");
+        src.setName("Y");
+
+        final IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> dataMapper.map(src,
+                        de.hoomit.mapping.test.domain.ReservedNameDTO.class,
+                        "DEFAULT"));
+
+        assertTrue(ex.getMessage().contains("shadows"),
+                "Error message should mention shadowing; got: " + ex.getMessage());
     }
 }

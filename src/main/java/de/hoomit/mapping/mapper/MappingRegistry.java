@@ -3,6 +3,7 @@ package de.hoomit.mapping.mapper;
 import de.hoomit.mapping.annotation.WsDTOMapping;
 import de.hoomit.mapping.converter.Converter;
 import de.hoomit.mapping.filter.FieldFilter;
+import de.hoomit.mapping.mapper.CustomMapper;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -16,11 +17,11 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Stores all registered {@link Converter}, {@link de.hoomit.mapping.mapper.CustomMapper}, and {@link FieldFilter}
+ * Stores all registered {@link Converter}, {@link CustomMapper}, and {@link FieldFilter}
  * beans and provides fast lookup by source+destination type pair.
  *
  * <p>Beans annotated with {@link WsDTOMapping} are auto-discovered when
- * {@link DefaultDataMapper} is initialised.</p>
+ * {@link de.hoomit.mapping.mapper.DefaultDataMapper} is initialised.</p>
  */
 public class MappingRegistry {
 
