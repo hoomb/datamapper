@@ -20,32 +20,8 @@ import java.util.Set;
  *   <li>{@code "DEFAULT,description"} → level + extras</li>
  * </ul>
  * </p>
- *
- * <p>Context keys:
- * <ul>
- *   <li>{@link #FIELD_SET_NAME} – the field set descriptor string</li>
- *   <li>{@link #MAP_NULLS}      – whether null values overwrite destination fields</li>
- *   <li>{@link #FIELD_PREFIX}   – dotted prefix for nested field resolution</li>
- * </ul>
- * </p>
  */
 public interface DataMapper {
-
-    /**
-     * Context key for the field set descriptor.
-     */
-    String FIELD_SET_NAME = "fieldSetName";
-
-    /**
-     * Context key for the mapNulls flag.
-     */
-    String MAP_NULLS = "mapNulls";
-
-    /**
-     * Context key for the field prefix.
-     */
-    String FIELD_PREFIX = "fieldPrefix";
-
     // =========================================================================
     // Single-object mapping – create & return
     // =========================================================================

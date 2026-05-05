@@ -71,7 +71,7 @@ public @interface FieldSetDefinition {
      * Each entry defines an arbitrary name and its associated field list.
      * Names are case-insensitive; an empty {@code fields} array means "all fields".
      *
-     * @see de.hoomit.mapping.fieldset.NamedFieldSet
+     * @see NamedFieldSet
      */
     NamedFieldSet[] custom() default {};
 }

@@ -5,25 +5,34 @@ import de.hoomit.mapping.fieldset.NamedFieldSet;
 
 import java.util.List;
 
+import static de.hoomit.mapping.fieldset.FieldSets.BASIC;
+
 /**
  * Web Service DTO for a product.
- * <p>
- * Field set levels:
- * - BASIC:    code, name
- * - DEFAULT:  code, name, price, available, stockLevel
- * - FULL:     (all fields, empty = sentinel)
- * - SEARCH:   code, name, categoryNames          (custom – search result cards)
- * - CHECKOUT: code, name, price, stockLevel      (custom – cart/checkout line items)
- * - ADMIN:    (all fields, empty = sentinel)     (custom – admin tools)
+ *
+ * <p>This DTO demonstrates <b>cumulative field-set definitions</b>: higher-level
+ * sets reference lower-level ones via the {@code FieldSets.BASIC} / {@code DEFAULT}
+ * constants, eliminating duplicate field listings.</p>
+ *
+ * <ul>
+ *   <li>BASIC    : code, name</li>
+ *   <li>DEFAULT  : BASIC + price + available + stockLevel</li>
+ *   <li>FULL     : (empty = ALL fields, sentinel)</li>
+ *   <li>SEARCH   : BASIC + categoryNames                          (custom)</li>
+ *   <li>CHECKOUT : BASIC + price + stockLevel                     (custom)</li>
+ *   <li>MOBILE   : SEARCH + stockLevel  (transitive: BASIC → SEARCH → MOBILE)</li>
+ *   <li>ADMIN    : (empty = ALL fields)                           (custom)</li>
+ * </ul>
  */
 @FieldSetDefinition(
         basic = {"code", "name"},
-        defaults = {"code", "name", "price", "available", "stockLevel"},
+        defaults = {BASIC, "price", "available", "stockLevel"},
         full = {},
         custom = {
-                @NamedFieldSet(name = "SEARCH", fields = {"code", "name", "categoryNames"}),
-                @NamedFieldSet(name = "CHECKOUT", fields = {"code", "name", "price", "stockLevel"}),
-                @NamedFieldSet(name = "ADMIN", fields = {}) // empty = ALL fields, like FULL
+                @NamedFieldSet(name = "SEARCH", fields = {BASIC, "categoryNames"}),
+                @NamedFieldSet(name = "CHECKOUT", fields = {BASIC, "price", "stockLevel"}),
+                @NamedFieldSet(name = "MOBILE", fields = {"@SEARCH", "stockLevel"}),
+                @NamedFieldSet(name = "ADMIN", fields = {})
         }
 )
 public class ProductWsDTO {

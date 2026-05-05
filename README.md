@@ -15,6 +15,7 @@
 - [Core Concepts](#core-concepts)
   - [Field Sets](#field-sets)
   - [Custom Named Field Sets](#custom-named-field-sets)
+  - [Cumulative Field Sets](#cumulative-field-sets)
   - [MappingContext](#mappingcontext)
   - [Converters](#converters)
   - [CustomMappers](#custommappers)
@@ -24,12 +25,13 @@
   - [1. Basic Mapping](#1-basic-mapping)
   - [2. Field-Set Filtering](#2-field-set-filtering)
   - [3. Custom Named Field Sets](#3-custom-named-field-sets)
-  - [4. Mapping onto an Existing Object](#4-mapping-onto-an-existing-object)
-  - [5. Collection Mapping](#5-collection-mapping)
-  - [6. Custom Converter](#6-custom-converter)
-  - [7. CustomMapper Post-Processor](#7-custommapper-post-processor)
-  - [8. FieldFilter](#8-fieldfilter)
-  - [9. Generic Type Mapping](#9-generic-type-mapping)
+  - [4. Cumulative Field Sets](#4-cumulative-field-sets)
+  - [5. Mapping onto an Existing Object](#5-mapping-onto-an-existing-object)
+  - [6. Collection Mapping](#6-collection-mapping)
+  - [7. Custom Converter](#7-custom-converter)
+  - [8. CustomMapper Post-Processor](#8-custommapper-post-processor)
+  - [9. FieldFilter](#9-fieldfilter)
+  - [10. Generic Type Mapping](#10-generic-type-mapping)
 - [Code Style Conventions](#code-style-conventions)
 - [API Reference](#api-reference)
 - [Mapping Pipeline](#mapping-pipeline)
@@ -66,6 +68,7 @@ final ProductWsDTO partial = dataMapper.map(productData, ProductWsDTO.class, "co
 ## Key Features
 
 - **Field-Set Filtering** — `BASIC`, `DEFAULT`, `FULL` levels plus **arbitrary custom named sets**, explicit field lists, and mixed descriptors like `"SEARCH,description"`
+- **Cumulative Definitions** — sets reference each other (`defaults = {BASIC, "price"}`) with transitive expansion and cycle detection
 - **Reflection-Based Mapping** — automatic getter → setter matching with a cached method-lookup engine; zero boilerplate for simple cases
 - **Custom Converters** — take full ownership of a source→destination transformation
 - **CustomMapper Post-Processors** — augment or override specific fields after the reflective pass
@@ -81,25 +84,25 @@ final ProductWsDTO partial = dataMapper.map(productData, ProductWsDTO.class, "co
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        DataMapper (interface)                    │
-│   map()  mapAsList()  mapAsSet()  mapAsCollection()  mapGeneric()│
-└───────────────────────────┬─────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                        DataMapper (interface)                     │
+│   map()  mapAsList()  mapAsSet()  mapAsCollection()  mapGeneric() │
+└───────────────────────────┬───────────────────────────────────────┘
                             │ implements
                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      DefaultDataMapper                           │
-│                                                                  │
-│  ┌──────────────┐  ┌───────────────────┐  ┌──────────────────┐ │
-│  │  Converter   │  │ ReflectionMapping │  │  CustomMapper    │ │
-│  │  Registry    │  │     Engine        │  │  (post-process)  │ │
-│  └──────────────┘  └───────────────────┘  └──────────────────┘ │
-│  ┌──────────────┐  ┌───────────────────┐                        │
-│  │ FieldFilter  │  │  FieldSetBuilder  │                        │
-│  │  Chain       │  │  (built-in +      │                        │
-│  │              │  │   custom names)   │                        │
-│  └──────────────┘  └───────────────────┘                        │
-└─────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                       DefaultDataMapper                           │
+│                                                                   │
+│   ┌──────────────┐  ┌───────────────────┐  ┌──────────────────┐   │
+│   │  Converter   │  │ ReflectionMapping │  │  CustomMapper    │   │
+│   │  Registry    │  │     Engine        │  │  (post-process)  │   │
+│   └──────────────┘  └───────────────────┘  └──────────────────┘   │
+│   ┌──────────────┐  ┌───────────────────┐                         │
+│   │ FieldFilter  │  │  FieldSetBuilder  │                         │
+│   │  Chain       │  │  (built-in +      │                         │
+│   │              │  │   custom names)   │                         │
+│   └──────────────┘  └───────────────────┘                         │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -108,7 +111,7 @@ final ProductWsDTO partial = dataMapper.map(productData, ProductWsDTO.class, "co
 
 ### Requirements
 
-- Java 17+
+- Java 21+
 - Maven 3.6+ (or compile manually — no external runtime dependencies)
 
 ### Install
@@ -117,11 +120,12 @@ final ProductWsDTO partial = dataMapper.map(productData, ProductWsDTO.class, "co
 <dependency>
     <groupId>de.hoomit.projects</groupId>
     <artifactId>datamapper</artifactId>
-    <version>1.1.1</version>
+    <version>1.1.9</version>
 </dependency>
 ```
 
 ## OR
+
 
 ### Build
 
@@ -225,6 +229,52 @@ final ProductWsDTO line = dataMapper.map(product, ProductWsDTO.class, "CHECKOUT"
 // Admin export — every field
 final ProductWsDTO export = dataMapper.map(product, ProductWsDTO.class, "ADMIN");
 ```
+
+---
+
+### Cumulative Field Sets
+
+In real APIs, higher-level sets almost always include lower-level ones. Repeating the same field names in `basic`, `defaults`, and `full` creates duplication that drifts over time.
+
+The framework supports **cumulative definitions** via reference constants in the `de.hoomit.mapping.fieldset.FieldSets` class. Inside any `String[]` array, an entry starting with `@` is a reference to another set and is expanded transitively at cache-build time.
+
+The recommended pattern uses a static import for maximum readability:
+
+```java
+import static de.hoomit.mapping.fieldset.FieldSets.*;
+
+@FieldSetDefinition(
+    basic    = {"code", "name"},
+    defaults = {BASIC, "price", "available", "stockLevel"},
+    full     = {DEFAULT, "description", "manufacturerName", "imageUrl"},
+    custom   = {
+        @NamedFieldSet(name = "SEARCH",   fields = {BASIC, "categoryNames"}),
+        @NamedFieldSet(name = "CHECKOUT", fields = {BASIC, "price", "stockLevel"}),
+        @NamedFieldSet(name = "MOBILE",   fields = {ref("SEARCH"), "stockLevel"})
+    }
+)
+public class ProductWsDTO { ... }
+```
+
+In this example:
+- `DEFAULT` resolves to `{code, name, price, available, stockLevel}`
+- `FULL` resolves to `DEFAULT`'s fields plus `description, manufacturerName, imageUrl`
+- `SEARCH` resolves to `{code, name, categoryNames}`
+- `MOBILE` resolves transitively through SEARCH → BASIC: `{code, name, categoryNames, stockLevel}`
+
+**Reference rules:**
+
+| Rule | Behaviour |
+|------|-----------|
+| Built-in references | Use constants `BASIC`, `DEFAULT`, `FULL` from `FieldSets` |
+| Custom references | Use `FieldSets.ref("SEARCH")` or the literal `"@SEARCH"` |
+| Case-insensitive | `"@search"`, `"@SEARCH"`, `"@Search"` all resolve identically |
+| Transitive | `MOBILE → SEARCH → BASIC` is fully expanded |
+| Circular | Throws `IllegalStateException` with the cycle path on first resolution |
+| Unknown | Throws `IllegalStateException` listing all known set names |
+| Reserved-name shadowing | A custom set named `"BASIC"`, `"DEFAULT"`, or `"FULL"` throws on resolution |
+
+The empty-array sentinel for "all fields" still works — `full = {}` and `@NamedFieldSet(name = "ADMIN", fields = {})` both expand to every declared field of the class.
 
 ---
 
@@ -473,7 +523,39 @@ final ProductWsDTO same = dataMapper.map(product, ProductWsDTO.class, "search");
 
 ---
 
-### 4. Mapping onto an Existing Object
+### 4. Cumulative Field Sets
+
+Avoid duplicating field lists. Reference one set from another using the `FieldSets` constants:
+
+```java
+import static de.hoomit.mapping.fieldset.FieldSets.*;
+
+@FieldSetDefinition(
+    basic    = {"code", "name"},
+    defaults = {BASIC, "price", "available", "stockLevel"},
+    full     = {DEFAULT, "description", "manufacturerName"},
+    custom   = {
+        @NamedFieldSet(name = "SEARCH", fields = {BASIC, "categoryNames"}),
+        @NamedFieldSet(name = "MOBILE", fields = {ref("SEARCH"), "stockLevel"})
+    }
+)
+public class ProductWsDTO { ... }
+```
+
+```java
+// DEFAULT now produces: {code, name, price, available, stockLevel}
+final ProductWsDTO d = dataMapper.map(product, ProductWsDTO.class, "DEFAULT");
+
+// MOBILE chains through SEARCH → BASIC, producing:
+// {code, name, categoryNames, stockLevel}
+final ProductWsDTO m = dataMapper.map(product, ProductWsDTO.class, "MOBILE");
+```
+
+Adding a new field to BASIC automatically propagates to every set that references it, eliminating the silent drift that comes from duplicated field lists.
+
+---
+
+### 5. Mapping onto an Existing Object
 
 ```java
 final ProductWsDTO existing = new ProductWsDTO();
@@ -497,7 +579,7 @@ dataMapper.map(update, existing, "FULL", /* mapNulls= */ false);
 
 ---
 
-### 5. Collection Mapping
+### 6. Collection Mapping
 
 ```java
 final List<ProductData> products = productFacade.getProductsForCategory("electronics");
@@ -517,7 +599,7 @@ dataMapper.mapAsCollection(products, accumulator, ProductWsDTO.class, "SEARCH");
 
 ---
 
-### 6. Custom Converter
+### 7. Custom Converter
 
 When you need full control over how a destination object is built (e.g. complex type transformations or calculated fields):
 
@@ -548,7 +630,7 @@ System.out.println(dto.getUrl()); // "/categories/electronics"
 
 ---
 
-### 7. CustomMapper Post-Processor
+### 8. CustomMapper Post-Processor
 
 Ideal when most fields map 1-to-1 by name, but a few need special handling:
 
@@ -576,7 +658,7 @@ public class OrderCustomMapper implements CustomMapper<OrderData, OrderWsDTO> {
 
 ---
 
-### 8. FieldFilter
+### 9. FieldFilter
 
 Use filters to apply cross-cutting rules across all mappings — for example, removing sensitive fields in non-admin contexts:
 
@@ -613,7 +695,7 @@ final MappingContext ctx = MappingContext.builder()
 
 ---
 
-### 9. Generic Type Mapping
+### 10. Generic Type Mapping
 
 For paginated responses or other parameterised wrapper types:
 
@@ -746,6 +828,19 @@ void addFilter(final FieldFilter f)
 )
 ```
 
+### Cumulative Reference Constants
+
+```java
+// Inside any String[] in @FieldSetDefinition or @NamedFieldSet,
+// these constants and the ref() helper expand transitively at cache-build time.
+public final class FieldSets {
+    public static final String BASIC   = "@BASIC";
+    public static final String DEFAULT = "@DEFAULT";
+    public static final String FULL    = "@FULL";
+    public static String ref(final String customName);   // → "@" + customName.toUpperCase()
+}
+```
+
 ---
 
 ## Mapping Pipeline
@@ -796,11 +891,12 @@ The `FieldSetBuilder` cache is a unified `Map<Class<?>, Map<String, Set<String>>
 
 | Feature | SAP Hybris DataMapper | This Framework |
 |---|---|---|
-| Core interface | `de.hybris.platform.webservicescommons.mapping.DataMapper` | `com.framework.mapping.DataMapper` |
+| Core interface | `de.hybris.platform.webservicescommons.mapping.DataMapper` | `de.hoomit.mapping.DataMapper` |
 | Default impl | `DefaultDataMapper extends ConfigurableMapper` | `DefaultDataMapper` (pure reflection) |
 | Mapping engine | Orika (`MapperFacade`) | Custom reflection engine |
 | Built-in field-set levels | ✅ `BASIC`, `DEFAULT`, `FULL` | ✅ `BASIC`, `DEFAULT`, `FULL` |
 | **Custom named field sets** | ❌ Not supported out of the box | ✅ `@NamedFieldSet` inside `@FieldSetDefinition#custom()` |
+| **Cumulative field-set definitions** | ❌ Not supported | ✅ `FieldSets.BASIC` / `DEFAULT` / `FULL` references with transitive expansion and cycle detection |
 | Auto-discovery | ✅ `@WsDTOMapping` + Spring context | ✅ `@WsDTOMapping` + `registerBeans()` |
 | Custom converters | ✅ Orika `Converter` | ✅ `Converter<S,D>` |
 | Custom mappers | ✅ Orika `Mapper` | ✅ `CustomMapper<A,B>` |
@@ -835,7 +931,8 @@ datamapper/
     │   │   ├── FieldLevel.java                # BASIC / DEFAULT / FULL enum
     │   │   ├── FieldSetDefinition.java        # @FieldSetDefinition (basic/defaults/full/custom)
     │   │   ├── NamedFieldSet.java             # @NamedFieldSet for custom named sets
-    │   │   └── FieldSetBuilder.java           # Resolves field sets with caching
+    │   │   ├── FieldSets.java                 # BASIC/DEFAULT/FULL constants + ref() helper
+    │   │   └── FieldSetBuilder.java           # Resolves field sets with caching + reference expansion
     │   └── impl/
     │       ├── DefaultDataMapper.java         # Main implementation
     │       ├── MappingRegistry.java           # Converter/mapper/filter store
@@ -843,10 +940,13 @@ datamapper/
     │       └── MappingException.java          # Unchecked runtime exception
     └── test/java/com/framework/mapping/
         └── test/
-            ├── DataMapperTest.java            # 23 JUnit 5 tests
+            ├── DataMapperTest.java            # 30 JUnit 5 tests
             ├── domain/
             │   ├── ProductData.java           # Service-layer domain object
-            │   └── ProductWsDTO.java          # WS DTO with @FieldSetDefinition + custom sets
+            │   ├── ProductWsDTO.java          # WS DTO with cumulative + custom field sets
+            │   ├── CyclicFieldSetDTO.java     # Fixture: circular reference (negative test)
+            │   ├── UnknownRefDTO.java         # Fixture: unknown reference (negative test)
+            │   └── ReservedNameDTO.java       # Fixture: name shadowing (negative test)
             └── mappers/
                 ├── ProductPriceMapper.java    # CustomMapper example
                 └── NullCollectionFilter.java  # FieldFilter example
@@ -863,7 +963,7 @@ mvn test
 Expected output:
 
 ```
-[INFO] Tests run: 23, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 30, Failures: 0, Errors: 0, Skipped: 0
 ```
 
 The test suite covers:
@@ -881,6 +981,17 @@ The test suite covers:
 - Custom `ADMIN` set with empty `fields = {}` behaves like `FULL`
 - Custom set combined with extras (`"SEARCH,description"`)
 - Case-insensitive name resolution (`"SEARCH"` ≡ `"search"` ≡ `"Search"`)
+
+**Cumulative field-set definitions**
+- DEFAULT inherits BASIC's fields via `{BASIC, ...}` reference
+- Custom SEARCH inherits BASIC's fields
+- Custom CHECKOUT inherits BASIC's fields
+- Transitive resolution through MOBILE → SEARCH → BASIC
+
+**Error handling**
+- Circular reference throws `IllegalStateException`
+- Unknown reference throws `IllegalStateException` with helpful message
+- Custom name shadowing a reserved level throws `IllegalStateException`
 
 **CustomMapper post-processing**
 - Price formatting (`BigDecimal` → `"EUR 1299.99"` string)

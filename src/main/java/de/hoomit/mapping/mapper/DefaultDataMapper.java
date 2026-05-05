@@ -1,6 +1,5 @@
 package de.hoomit.mapping.mapper;
 
-
 import de.hoomit.mapping.annotation.WsDTOMapping;
 import de.hoomit.mapping.context.MappingContext;
 import de.hoomit.mapping.converter.Converter;
@@ -25,8 +24,8 @@ import java.util.stream.StreamSupport;
  * <p>Mapping pipeline for a single object:
  * <ol>
  *   <li>If a {@link Converter} is registered for (source, dest), delegate entirely.</li>
- *   <li>Otherwise: run the {@link ReflectionMappingEngine} to copy matching fields.</li>
- *   <li>If a {@link de.hoomit.mapping.mapper.CustomMapper} is registered, call {@code mapAtoB} as a post-processor.</li>
+ *   <li>Otherwise: run the {@link de.hoomit.mapping.mapper.ReflectionMappingEngine} to copy matching fields.</li>
+ *   <li>If a {@link CustomMapper} is registered, call {@code mapAtoB} as a post-processor.</li>
  * </ol>
  * </p>
  *
@@ -40,9 +39,7 @@ import java.util.stream.StreamSupport;
  */
 public class DefaultDataMapper implements DataMapper {
 
-    private static final String FIELDSET_DEFAULT = "DEFAULT";
-    private static final String FIELDSET_EXPLICIT = "EXPLICIT";
-    private final MappingRegistry registry = new MappingRegistry();
+    protected final MappingRegistry registry = new MappingRegistry();
     private final ReflectionMappingEngine engine = new ReflectionMappingEngine();
 
     // =========================================================================
@@ -94,7 +91,7 @@ public class DefaultDataMapper implements DataMapper {
 
         final Set<String> resolved = FieldSetBuilder.resolve(destClass, fields);
         final MappingContext ctx = MappingContext.builder()
-                .fieldSetName(fields != null ? fields : FIELDSET_DEFAULT)
+                .fieldSetName(fields != null ? fields : "DEFAULT")
                 .resolvedFields(resolved)
                 .build();
 
@@ -107,7 +104,7 @@ public class DefaultDataMapper implements DataMapper {
         Objects.requireNonNull(destClass, "destinationClass must not be null");
 
         final MappingContext ctx = MappingContext.builder()
-                .fieldSetName(FIELDSET_EXPLICIT)
+                .fieldSetName("EXPLICIT")
                 .resolvedFields(fields != null ? fields : Collections.emptySet())
                 .build();
 
@@ -120,12 +117,12 @@ public class DefaultDataMapper implements DataMapper {
 
     @Override
     public <S, D> void map(final S source, final D dest) {
-        map(source, dest, null, false);
+        map(source, dest, (String) null, false);
     }
 
     @Override
     public <S, D> void map(final S source, final D dest, final boolean mapNulls) {
-        map(source, dest, null, mapNulls);
+        map(source, dest, (String) null, mapNulls);
     }
 
     @Override
@@ -143,7 +140,7 @@ public class DefaultDataMapper implements DataMapper {
         final Class<D> destClass = (Class<D>) dest.getClass();
         final Set<String> resolved = FieldSetBuilder.resolve(destClass, fields);
         final MappingContext ctx = MappingContext.builder()
-                .fieldSetName(fields != null ? fields : FIELDSET_DEFAULT)
+                .fieldSetName(fields != null ? fields : "DEFAULT")
                 .mapNulls(mapNulls)
                 .resolvedFields(resolved)
                 .build();
@@ -168,7 +165,7 @@ public class DefaultDataMapper implements DataMapper {
         final Class<D> destClass = (Class<D>) dest.getClass();
         final Set<String> resolved = FieldSetBuilder.resolve(destClass, fields);
         final MappingContext ctx = MappingContext.builder()
-                .fieldSetName(fields != null ? fields : FIELDSET_DEFAULT)
+                .fieldSetName(fields != null ? fields : "DEFAULT")
                 .resolvedFields(resolved)
                 .extra("sourceTypeArgs", sourceTypeArgs)
                 .extra("destTypeArgs", destTypeArgs)
@@ -253,7 +250,9 @@ public class DefaultDataMapper implements DataMapper {
         try {
             return clazz.getDeclaredConstructor().newInstance();
         } catch (final Exception e) {
-            throw new MappingException("Cannot instantiate destination class " + clazz.getName() + ". Ensure it has a public no-arg constructor.", e);
+            throw new MappingException(
+                    "Cannot instantiate destination class " + clazz.getName()
+                            + ". Ensure it has a public no-arg constructor.", e);
         }
     }
 }
