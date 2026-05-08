@@ -120,7 +120,7 @@ final ProductWsDTO partial = dataMapper.map(productData, ProductWsDTO.class, "co
 <dependency>
     <groupId>de.hoomit.projects</groupId>
     <artifactId>datamapper</artifactId>
-    <version>1.1.9</version>
+    <version>1.1.10</version>
 </dependency>
 ```
 
@@ -139,6 +139,38 @@ To run only the tests:
 
 ```bash
 mvn test
+```
+---
+## Using with Spring Boot
+
+In a Spring Boot application, the `DataMapper` is registered as a bean automatically. Just inject it where you need it:
+
+```java
+@Autowired
+private DataMapper dataMapper;
+```
+
+If you prefer Constructor injection:
+
+```java
+private final DataMapper dataMapper;
+
+public ProductService(final DataMapper dataMapper) {
+    this.dataMapper = dataMapper;
+}
+```
+
+## Hiding default and null fields in JSON responses
+
+Thanks to the `@JacksonAnnotationsInside` meta-annotation on `@FieldSetDefinition`, any DTO marked with `@FieldSetDefinition` is automatically serialized with `@JsonInclude(JsonInclude.Include.NON_DEFAULT)` — fields whose values equal their type's default (`null`, `0`, `false`, empty collections) are omitted from the JSON output.
+
+If you want to apply the same behavior to a DTO that doesn't use `@FieldSetDefinition`, add the annotation explicitly:
+
+```java
+@JsonInclude(JsonInclude.Include.NON_DEFAULT)
+public class ProductDTO {
+    // ...
+}
 ```
 
 ---
