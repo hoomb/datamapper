@@ -4,7 +4,7 @@
 
     <groupId>de.hoomit.projects</groupId>
     <artifactId>datamapper</artifactId>
-    <version>1.1.10-SNAPSHOT</version>
+    <version>1.1.11-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>DataMapper Framework</name>
     <description>DataMapper framework with field-set filtering</description>
@@ -17,6 +17,7 @@
         <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.2.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.1.0</maven-gpg-plugin.version>
+        <spring.version>4.0.6</spring.version>
     </properties>
 
     <url>https://github.com/hoomb/datamapper</url>
@@ -49,6 +50,18 @@
             <artifactId>junit-jupiter</artifactId>
             <version>5.12.2</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+            <version>${spring.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <version>${spring.version}</version>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 
