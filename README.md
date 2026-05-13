@@ -20,6 +20,7 @@
   - [Converters](#converters)
   - [CustomMappers](#custommappers)
   - [FieldFilters](#fieldfilters)
+  - [Field Renaming with @FieldMapping](#field-renaming-with-fieldmapping)
   - [Auto-Discovery with @WsDTOMapping](#auto-discovery-with-wsdtomapping)
 - [Usage Examples](#usage-examples)
   - [1. Basic Mapping](#1-basic-mapping)
@@ -32,6 +33,7 @@
   - [8. CustomMapper Post-Processor](#8-custommapper-post-processor)
   - [9. FieldFilter](#9-fieldfilter)
   - [10. Generic Type Mapping](#10-generic-type-mapping)
+  - [11. Field Renaming Between DTO and Domain](#11-field-renaming-between-dto-and-domain)
 - [Code Style Conventions](#code-style-conventions)
 - [API Reference](#api-reference)
 - [Mapping Pipeline](#mapping-pipeline)
@@ -73,6 +75,7 @@ final ProductWsDTO partial = dataMapper.map(productData, ProductWsDTO.class, "co
 - **Custom Converters** — take full ownership of a source→destination transformation
 - **CustomMapper Post-Processors** — augment or override specific fields after the reflective pass
 - **FieldFilters** — programmatically exclude fields based on their value (e.g. skip empty collections)
+- **Field Renaming** — bridge naming differences between source and destination via `@FieldMapping` (repeatable; works symmetrically from either side)
 - **Auto-Discovery** — annotate beans with `@WsDTOMapping` and register them in one call; integrates cleanly with Spring's `ApplicationContext`
 - **Collection Helpers** — `mapAsList`, `mapAsSet`, `mapAsCollection`
 - **Generic Type Support** — `mapGeneric` for parameterised types like `PageData<ProductData>`
@@ -418,6 +421,49 @@ public class EmptyCollectionFilter implements FieldFilter {
 
 ---
 
+### Field Renaming with @FieldMapping
+
+When a source and destination field carry different names — common when bridging external DTOs to internal domain types — declare a `@FieldMapping` on the field that needs renaming:
+
+```java
+public class UserSignUpWsDTO {
+
+    @FieldMapping(pairedClass = RegisterData.class, pairedField = "login")
+    private String uid;
+
+    private String password;
+}
+```
+
+This single declaration covers both mapping directions: `UserSignUpWsDTO → RegisterData` (write `uid`'s value into `login`) **and** `RegisterData → UserSignUpWsDTO` (write `login`'s value into `uid`). The framework consults `@FieldMapping` declarations on both sides of the class pair, so you only need to annotate one of them.
+
+**Multiple targets on a single field.** `@FieldMapping` is `@Repeatable`. A DTO field that maps to several domain types just stacks the annotations — no container annotation needed:
+
+```java
+public class UserSignUpWsDTO {
+
+    @FieldMapping(pairedClass = RegisterData.class,   pairedField = "login")
+    @FieldMapping(pairedClass = LegacyUserData.class, pairedField = "username")
+    private String uid;
+}
+```
+
+When mapping `UserSignUpWsDTO → RegisterData`, the first declaration applies; when mapping to `LegacyUserData`, the second applies. Each is selected by its `pairedClass` argument at mapping time.
+
+**Where to put the annotation.** Either side works. Put it on the DTO when the domain class is third-party or generated. Put it on the domain class when several DTOs map to the same domain field with the same rename. If both sides declare the same rename, the source-side declaration wins — but this is best avoided to keep the configuration single-sourced.
+
+**Interaction with field sets.** Field-set descriptors always refer to the **destination** field name. To include the renamed field in a custom set on `RegisterData`, list `login` (not `uid`). This matches the principle that field sets describe the shape of the output.
+
+| Rule | Behaviour |
+|------|-----------|
+| Annotation location | Either source or destination class; both work |
+| Repeatable | Multiple `@FieldMapping` on the same field, one per `pairedClass` |
+| Direction-agnostic | A single declaration works for both source→dest and dest→source |
+| Conflict resolution | Source-side declaration wins if both sides annotate the same rename |
+| Field-set names | Always refer to the destination field name |
+
+---
+
 ### Auto-Discovery with @WsDTOMapping
 
 Mark any `Converter`, `CustomMapper`, or `FieldFilter` bean with `@WsDTOMapping` and register it in one call:
@@ -750,6 +796,71 @@ dataMapper.mapGeneric(
 
 ---
 
+### 11. Field Renaming Between DTO and Domain
+
+A `UserSignUpWsDTO` (external API) and a `RegisterData` (internal domain) carry the user identifier under different field names:
+
+```java
+public class UserSignUpWsDTO {
+
+    @FieldMapping(pairedClass = RegisterData.class, pairedField = "login")
+    private String uid;
+
+    private String password;
+    private String firstName;
+    private String lastName;
+    // getters / setters ...
+}
+
+public class RegisterData {
+
+    private String login;
+    private String password;
+    private String firstName;
+    private String lastName;
+    // getters / setters ...
+}
+```
+
+The annotation works in both directions:
+
+```java
+// Incoming: DTO → Domain (uid → login)
+final UserSignUpWsDTO incoming = parseFromJson(request);
+final RegisterData domain = dataMapper.map(incoming, RegisterData.class, "FULL");
+// domain.getLogin() returns the value originally in incoming.getUid()
+
+// Outgoing: Domain → DTO (login → uid)
+final RegisterData stored = userFacade.load(userId);
+final UserSignUpWsDTO outgoing = dataMapper.map(stored, UserSignUpWsDTO.class, "FULL");
+// outgoing.getUid() returns the value originally in stored.getLogin()
+```
+
+For a DTO that maps to several domain types, stack the annotations:
+
+```java
+public class UserSignUpWsDTO {
+
+    @FieldMapping(pairedClass = RegisterData.class,   pairedField = "login")
+    @FieldMapping(pairedClass = LegacyUserData.class, pairedField = "username")
+    private String uid;
+    // ...
+}
+
+// Selected by pairedClass at mapping time
+final RegisterData   reg    = dataMapper.map(dto, RegisterData.class,   "FULL");  // uid → login
+final LegacyUserData legacy = dataMapper.map(dto, LegacyUserData.class, "FULL");  // uid → username
+```
+
+Field-set descriptors refer to destination names — so to include the renamed field, list `"login"`, not `"uid"`:
+
+```java
+final RegisterData partial = dataMapper.map(dto, RegisterData.class, "login");
+// partial.getLogin() is populated; other fields stay null
+```
+
+---
+
 ## Code Style Conventions
 
 The framework follows a few conventions consistently across its codebase. Contributors are expected to honour them:
@@ -860,6 +971,17 @@ void addFilter(final FieldFilter f)
 )
 ```
 
+### Field Renaming Annotation
+
+```java
+// Repeatable — stack multiple on a single field for multiple paired classes.
+// Place on either the source or the destination class; both sides are honoured.
+@FieldMapping(
+    pairedClass = Class<?>,      // the class on the other side of the mapping
+    pairedField = String         // field name on the paired class
+)
+```
+
 ### Cumulative Reference Constants
 
 ```java
@@ -901,11 +1023,14 @@ Input: sourceObject, destinationClass, fields, mapNulls
   ▼
 5. ReflectionMappingEngine
    For each setter on destination class:
-     a. ctx.includes(fieldName)?           → skip if false
-     b. Read value via getter (or field)
-     c. value == null && !mapNulls?        → skip if true
-     d. FieldFilter.include(field, value)? → skip if false
-     e. setter.invoke(dest, value)
+     a. Resolve source-side name via FieldMappingRegistry
+        (uses @FieldMapping renames if declared; falls back to
+        the destination field name for 1:1 matches)
+     b. ctx.includes(destFieldName)?         → skip if false
+     c. Read value via source getter (or field)
+     d. value == null && !mapNulls?          → skip if true
+     e. FieldFilter.include(field, value)?   → skip if false
+     f. setter.invoke(dest, value)
   │
   ▼
 6. Is a CustomMapper<S,D> registered?
@@ -929,6 +1054,7 @@ The `FieldSetBuilder` cache is a unified `Map<Class<?>, Map<String, Set<String>>
 | Built-in field-set levels | ✅ `BASIC`, `DEFAULT`, `FULL` | ✅ `BASIC`, `DEFAULT`, `FULL` |
 | **Custom named field sets** | ❌ Not supported out of the box | ✅ `@NamedFieldSet` inside `@FieldSetDefinition#custom()` |
 | **Cumulative field-set definitions** | ❌ Not supported | ✅ `FieldSets.BASIC` / `DEFAULT` / `FULL` references with transitive expansion and cycle detection |
+| **Field renaming** | ✅ XML `FieldMapper` bean | ✅ `@FieldMapping` annotation (repeatable, symmetric, no XML) |
 | Auto-discovery | ✅ `@WsDTOMapping` + Spring context | ✅ `@WsDTOMapping` + `registerBeans()` |
 | Custom converters | ✅ Orika `Converter` | ✅ `Converter<S,D>` |
 | Custom mappers | ✅ Orika `Mapper` | ✅ `CustomMapper<A,B>` |
@@ -950,7 +1076,9 @@ datamapper/
     ├── main/java/com/framework/mapping/
     │   ├── DataMapper.java                    # Central interface
     │   ├── annotation/
-    │   │   └── WsDTOMapping.java              # Auto-discovery marker
+    │   │   ├── WsDTOMapping.java              # Auto-discovery marker
+    │   │   ├── FieldMapping.java              # Per-field rename (repeatable)
+    │   │   └── FieldMappings.java             # Container for repeated @FieldMapping
     │   ├── context/
     │   │   └── MappingContext.java            # Immutable context value object
     │   ├── converter/
@@ -968,14 +1096,20 @@ datamapper/
     │   └── impl/
     │       ├── DefaultDataMapper.java         # Main implementation
     │       ├── MappingRegistry.java           # Converter/mapper/filter store
+    │       ├── FieldMappingRegistry.java      # @FieldMapping rename cache
     │       ├── ReflectionMappingEngine.java   # Getter→setter reflection engine
     │       └── MappingException.java          # Unchecked runtime exception
     └── test/java/com/framework/mapping/
         └── test/
-            ├── DataMapperTest.java            # 30 JUnit 5 tests
+            ├── DataMapperTest.java            # Field-set, converter, filter tests
+            ├── FieldMappingTest.java          # @FieldMapping rename tests
             ├── domain/
             │   ├── ProductData.java           # Service-layer domain object
             │   ├── ProductWsDTO.java          # WS DTO with cumulative + custom field sets
+            │   ├── UserSignUpWsDTO.java       # DTO with repeated @FieldMapping
+            │   ├── RegisterData.java          # Domain target for UserSignUpWsDTO
+            │   ├── LegacyUserData.java        # Second domain target (multi-target test)
+            │   ├── AuditEvent.java            # Dest-side-only @FieldMapping fixture
             │   ├── CyclicFieldSetDTO.java     # Fixture: circular reference (negative test)
             │   ├── UnknownRefDTO.java         # Fixture: unknown reference (negative test)
             │   └── ReservedNameDTO.java       # Fixture: name shadowing (negative test)
@@ -990,12 +1124,6 @@ datamapper/
 
 ```bash
 mvn test
-```
-
-Expected output:
-
-```
-[INFO] Tests run: 30, Failures: 0, Errors: 0, Skipped: 0
 ```
 
 The test suite covers:
@@ -1040,6 +1168,14 @@ The test suite covers:
 **FieldFilter**
 - Empty collections excluded
 - Non-empty collections passed through
+
+**Field renaming with @FieldMapping**
+- Source-side declaration applies to `source → dest` direction
+- Destination-side declaration applies symmetrically (`source → dest` and reverse)
+- Multiple `@FieldMapping` on one field, selected by `pairedClass`
+- Round-trip preserves the original value
+- Field-set descriptor refers to the destination name after rename
+- Registry caches results across calls
 
 **Edge cases**
 - Zero-value primitives mapped correctly

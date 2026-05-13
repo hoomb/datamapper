@@ -30,6 +30,12 @@ class ReflectionMappingEngine {
     private static final Map<Class<?>, Map<String, Method>> GETTER_CACHE = new ConcurrentHashMap<>();
     private static final Map<Class<?>, Map<String, Method>> SETTER_CACHE = new ConcurrentHashMap<>();
 
+    private final FieldMappingRegistry fieldMappings;
+
+    ReflectionMappingEngine(final FieldMappingRegistry fieldMappings) {
+        this.fieldMappings = fieldMappings;
+    }
+
     // -------------------------------------------------------------------------
 
     void map(final Object source, final Object dest,
@@ -39,27 +45,37 @@ class ReflectionMappingEngine {
         final Class<?> destClass = dest.getClass();
         final Map<String, Method> getters = gettersOf(srcClass);
         final Map<String, Method> setters = settersOf(destClass);
+        final Map<String, String> renames = fieldMappings.renamesFor(srcClass, destClass);
 
-        setters.forEach((fieldName, setter) -> {
+        // Inverted view: destination field name -> source field name to read from.
+        // The registry stores sourceName -> destName; we iterate over setters, so
+        // we need the reverse direction.
+        final Map<String, String> sourceForDest = invert(renames);
 
-            // 1. Field-set filter
-            if (!ctx.includes(fieldName)) return;
+        setters.forEach((destFieldName, setter) -> {
 
-            // 2. Resolve value from getter or direct field
-            final Object value = resolveValue(source, fieldName, getters);
+            // 1. Field-set filter (descriptors refer to DESTINATION names)
+            if (!ctx.includes(destFieldName)) return;
 
-            // 3. Null handling
+            // 2. Resolve which source-side name to read.
+            //    If a @FieldMapping declares a rename, use the source name;
+            //    otherwise fall back to the destination name (1:1 by convention).
+            final String sourceFieldName = sourceForDest.getOrDefault(destFieldName, destFieldName);
+
+            // 3. Resolve value from getter or direct field
+            final Object value = resolveValue(source, sourceFieldName, getters);
+
+            // 4. Null handling
             if (value == null && !ctx.isMapNulls()) return;
 
-            // 4. FieldFilter chain
-            if (!passFilters(filters, fieldName, value, ctx, srcClass, destClass)) return;
+            // 5. FieldFilter chain (filters see the destination field name)
+            if (!passFilters(filters, destFieldName, value, ctx, srcClass, destClass)) return;
 
-            // 5. Write to destination
+            // 6. Write to destination
             try {
                 setter.invoke(dest, value);
-            } catch (Exception e) {
-                // Type mismatch – attempt direct field write
-                writeDirectField(dest, fieldName, value, ctx.isMapNulls());
+            } catch (final Exception e) {
+                writeDirectField(dest, destFieldName, value, ctx.isMapNulls());
             }
         });
     }
@@ -119,6 +135,14 @@ class ReflectionMappingEngine {
                         filter.isApplicable(src, dest) && !filter.include(fieldName, value, ctx));
     }
 
+    private static Map<String, String> invert(final Map<String, String> renames) {
+        if (renames.isEmpty()) return Collections.emptyMap();
+        return renames.entrySet().stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        Map.Entry::getValue,
+                        Map.Entry::getKey,
+                        (a, b) -> a));   // collisions: first one wins; validator catches these at registration
+    }
     // -------------------------------------------------------------------------
     // Cache-building helpers
     // -------------------------------------------------------------------------
