@@ -3,7 +3,6 @@ package de.hoomit.mapping.mapper;
 import de.hoomit.mapping.annotation.WsDTOMapping;
 import de.hoomit.mapping.converter.Converter;
 import de.hoomit.mapping.filter.FieldFilter;
-import de.hoomit.mapping.mapper.CustomMapper;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;

@@ -39,8 +39,9 @@ import java.util.stream.StreamSupport;
  */
 public class DefaultDataMapper implements DataMapper {
 
-    protected final MappingRegistry registry = new MappingRegistry();
-    private final ReflectionMappingEngine engine = new ReflectionMappingEngine();
+    private final MappingRegistry registry = new MappingRegistry();
+    private final FieldMappingRegistry fieldMappings = new FieldMappingRegistry();
+    private final ReflectionMappingEngine engine = new ReflectionMappingEngine(fieldMappings);
 
     // =========================================================================
     // Bean Registration
